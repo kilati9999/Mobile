@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Gesture Home",
+    "slug": "gesture-home",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#080a0e",
+    "splash": {
+      "backgroundColor": "#080a0e"
+    },
+    "android": {
+      "package": "com.gesturehome.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#080a0e"
+      },
+      "usesCleartextTraffic": true,
+      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"]
+    },
+    "extra": {
+      "defaultServerUrl": "http://10.0.2.2:5050"
+    }
+  }
+}
