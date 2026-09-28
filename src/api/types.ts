@@ -56,8 +56,8 @@ export interface HandState {
 export interface HistoryEntry {
   id: number;
   time: string;
-  hand: string;
-  gesture: string;
+  hand: string | null;
+  gesture: string | null;
   confidence: number;
   action: string;
   device: string;
@@ -102,6 +102,21 @@ export interface SensorAlert {
   site_name: string;
   type: "fire" | "cleared";
   message: string;
+}
+
+export interface Account {
+  username: string;
+  display_name: string;
+  role: Role;
+  site_id: string | null;
+}
+
+export interface PendingBoard {
+  chip_id: string;
+  ip: string | null;
+  status: "connected" | "disconnected";
+  first_seen: string;
+  last_seen: string;
 }
 
 export interface SensorsResponse {

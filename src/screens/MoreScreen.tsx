@@ -46,7 +46,7 @@ export default function MoreScreen() {
       </View>
 
       <View style={styles.section}>
-        <MenuRow icon="time" label="Lịch sử lệnh" onPress={() => navigation.navigate("History")} />
+        <MenuRow icon="time" label="Nhật ký" sub="Lệnh cử chỉ & cảnh báo cháy" onPress={() => navigation.navigate("Logs")} />
         <MenuRow icon="settings" label="Cài đặt" sub="Địa chỉ máy chủ" onPress={() => navigation.navigate("Settings")} />
       </View>
 

@@ -15,6 +15,7 @@ interface Props {
 
 function subtitleFor(device: Device): string {
   if (device.status !== "ok") return STATUS_META[device.status]?.label || device.status_label;
+  if (device.type === "door") return device.state ? "Đang mở" : "Đã khoá";
   if (!device.state) return "Đang tắt";
   if (device.type === "dimmer") return `Độ sáng ${device.level ?? 0}%`;
   if (device.type === "speed") return `Tốc độ mức ${device.level ?? 0}`;

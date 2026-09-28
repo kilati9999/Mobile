@@ -1,24 +1,53 @@
 {
   "expo": {
-    "name": "Gesture Home",
+    "name": "SmartHome",
     "slug": "gesture-home",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#080a0e",
     "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
       "backgroundColor": "#080a0e"
     },
     "android": {
       "package": "com.gesturehome.app",
       "adaptiveIcon": {
-        "backgroundColor": "#080a0e"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0d1116"
       },
-      "usesCleartextTraffic": true,
-      "permissions": ["INTERNET", "ACCESS_NETWORK_STATE"]
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "CAMERA",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "extra": {
-      "defaultServerUrl": "http://10.0.2.2:5050"
-    }
+      "defaultServerUrl": "http://10.0.2.2:5050",
+      "eas": {
+        "projectId": "f9e1692e-177f-4504-96f4-ad27729ef9d6"
+      }
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Cho phép SmartHome dùng camera để chụp ảnh khuôn mặt khi huấn luyện tại chỗ."
+        }
+      ]
+    ],
+    "owner": "kilati"
   }
 }

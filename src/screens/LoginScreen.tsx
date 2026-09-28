@@ -56,7 +56,7 @@ export default function LoginScreen() {
               <Ionicons name="hand-left" size={22} color="#04141c" />
             </View>
             <View>
-              <Text style={styles.brandTitle}>Gesture Home</Text>
+              <Text style={styles.brandTitle}>SmartHome</Text>
               <Text style={styles.brandSub}>Điều khiển thiết bị bằng cử chỉ tay</Text>
             </View>
           </View>

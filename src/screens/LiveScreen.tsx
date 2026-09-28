@@ -1,48 +1,47 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getState } from "../api/client";
-import type { HandState, HistoryEntry } from "../api/types";
+import type { HistoryEntry } from "../api/types";
+import { useAuth } from "../context/AuthContext";
 import { usePolling } from "../hooks/usePolling";
+import type { RootStackParamList } from "../navigation/types";
 import { colors, radius, spacing, typography } from "../theme";
 
-const DEBOUNCE_FRAMES = 6;
+type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-function HandCard({ label, hand, tint }: { label: string; hand: HandState | undefined; tint: string }) {
-  const confidence = Math.round((hand?.confidence || 0) * 100);
-  const buffer = hand?.buffer || 0;
+/**
+ * Khối này thay cho 2 thẻ "Tay trái"/"Tay phải" trước đây - đăng ký
+ * khuôn mặt người dùng mới ngay tại đây (chụp 5 ảnh qua camera điện
+ * thoại), đồng bộ với hệ thống xác thực cửa (door_access.py). Chỉ admin
+ * mới thực hiện được (thao tác nhạy cảm, ảnh hưởng quyền ra vào thật).
+ */
+function FaceEnrollPanel() {
+  const navigation = useNavigation<Nav>();
+  const { user } = useAuth();
+  const canEnroll = user?.role === "admin";
+
   return (
-    <View style={[styles.handCard, { borderTopColor: tint }]}>
-      <View style={styles.handHead}>
-        <View style={styles.handLabelRow}>
-          <View style={[styles.swatch, { backgroundColor: tint }]} />
-          <Text style={styles.handLabel}>{label}</Text>
-        </View>
-        <View style={styles.trackRow}>
-          <View style={[styles.trackDot, { backgroundColor: hand?.tracked ? colors.good : colors.textFaint }]} />
-          <Text style={[styles.trackText, { color: hand?.tracked ? colors.good : colors.textFaint }]}>
-            {hand?.tracked ? "Đang theo dõi" : "Mất theo dõi"}
-          </Text>
-        </View>
+    <View style={styles.enrollCard}>
+      <View style={styles.enrollIconWrap}>
+        <Ionicons name="person-add" size={26} color={colors.accent} />
       </View>
-
-      <Text style={styles.gesture}>{hand?.tracked ? hand.gesture : "—"}</Text>
-      <Text style={styles.updatedAt}>{hand?.updated_at ? `cập nhật ${hand.updated_at}` : "chưa có dữ liệu"}</Text>
-
-      <View style={styles.meterRow}>
-        <Text style={styles.meterLabel}>Độ tin cậy</Text>
-        <View style={styles.meterTrack}>
-          <View style={[styles.meterFill, { width: `${confidence}%`, backgroundColor: tint }]} />
+      <Text style={styles.enrollTitle}>Huấn luyện khuôn mặt tại chỗ</Text>
+      <Text style={styles.enrollDesc}>
+        Chụp 5 ảnh khuôn mặt theo hướng dẫn để đăng ký người dùng mới, đồng bộ với hệ thống xác thực cửa.
+      </Text>
+      {canEnroll ? (
+        <TouchableOpacity style={styles.enrollBtn} onPress={() => navigation.navigate("FaceEnroll")} activeOpacity={0.85}>
+          <Text style={styles.enrollBtnText}>Bắt đầu</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.comingSoonChip}>
+          <Text style={styles.comingSoonText}>Chỉ admin mới đăng ký được</Text>
         </View>
-        <Text style={styles.meterVal}>{confidence}%</Text>
-      </View>
-
-      <View style={styles.bufferRow}>
-        {Array.from({ length: DEBOUNCE_FRAMES }).map((_, i) => (
-          <View key={i} style={[styles.bufferCell, i < buffer && { backgroundColor: colors.accent }]} />
-        ))}
-      </View>
+      )}
     </View>
   );
 }
@@ -52,10 +51,11 @@ function FeedItem({ entry }: { entry: HistoryEntry }) {
     <View style={[styles.feedItem, !entry.applied && styles.feedItemBlocked]}>
       <View style={styles.feedTop}>
         <Text style={styles.feedTime}>{entry.time}</Text>
-        <Text style={styles.feedHand}>{entry.hand}</Text>
+        <Text style={styles.feedHand}>{entry.hand || "Cửa"}</Text>
       </View>
       <Text style={styles.feedMain}>
-        {entry.gesture} → {entry.action} · <Text style={{ fontWeight: "700" }}>{entry.device}</Text>
+        {entry.gesture ? `${entry.gesture} → ` : ""}
+        {entry.action} · <Text style={{ fontWeight: "700" }}>{entry.device}</Text>
       </Text>
       {entry.note ? <Text style={styles.feedNote}>{entry.note}</Text> : null}
     </View>
@@ -69,11 +69,10 @@ export default function LiveScreen() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>Trực tiếp</Text>
-        <Text style={styles.subtitle}>Buffer &amp; độ tin cậy theo thời gian thực cho từng tay</Text>
+        <Text style={styles.subtitle}>Nhật ký hành động và huấn luyện tại chỗ</Text>
       </View>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <HandCard label="Tay trái" hand={data?.hands["Trái"]} tint={colors.violet} />
-        <HandCard label="Tay phải" hand={data?.hands["Phải"]} tint={colors.sky} />
+        <FaceEnrollPanel />
 
         <View style={styles.sectionHead}>
           <Ionicons name="time" size={13} color={colors.textFaint} />
@@ -95,31 +94,31 @@ const styles = StyleSheet.create({
   subtitle: { color: colors.textDim, fontSize: 12.5, marginTop: 4 },
   scroll: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxxl, gap: spacing.md },
 
-  handCard: {
+  enrollCard: {
     backgroundColor: colors.card,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    borderTopWidth: 3,
-    padding: spacing.lg,
+    borderStyle: "dashed",
+    padding: spacing.xl,
+    alignItems: "center",
+    marginBottom: spacing.lg,
+  },
+  enrollIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: colors.accentSoft,
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: spacing.md,
   },
-  handHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.md },
-  handLabelRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  swatch: { width: 10, height: 10, borderRadius: 3 },
-  handLabel: { color: colors.text, fontSize: 14, fontWeight: "700" },
-  trackRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  trackDot: { width: 7, height: 7, borderRadius: 3.5 },
-  trackText: { fontSize: 11, fontWeight: "600" },
-  gesture: { color: colors.text, fontSize: 24, fontWeight: "800", marginBottom: 2 },
-  updatedAt: { color: colors.textFaint, fontSize: 11, fontFamily: "monospace", marginBottom: spacing.md },
-  meterRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: spacing.md },
-  meterLabel: { color: colors.textFaint, fontSize: 11, width: 64 },
-  meterTrack: { flex: 1, height: 8, borderRadius: 999, backgroundColor: colors.cardAlt, overflow: "hidden" },
-  meterFill: { height: "100%", borderRadius: 999 },
-  meterVal: { color: colors.text, fontSize: 12, fontFamily: "monospace", width: 36, textAlign: "right" },
-  bufferRow: { flexDirection: "row", gap: 5 },
-  bufferCell: { flex: 1, height: 8, borderRadius: 4, backgroundColor: colors.cardAlt },
+  enrollTitle: { color: colors.text, fontSize: 15, fontWeight: "800", marginBottom: spacing.sm, textAlign: "center" },
+  enrollDesc: { color: colors.textDim, fontSize: 12.5, lineHeight: 19, textAlign: "center", marginBottom: spacing.md },
+  comingSoonChip: { backgroundColor: colors.cardAlt, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
+  comingSoonText: { color: colors.textFaint, fontSize: 11, fontWeight: "700" },
+  enrollBtn: { backgroundColor: colors.accent, borderRadius: radius.sm, paddingHorizontal: 24, paddingVertical: 11 },
+  enrollBtnText: { color: "#04141c", fontSize: 13, fontWeight: "800" },
 
   sectionHead: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: spacing.sm, marginBottom: spacing.sm },
   sectionTitle: { color: colors.text, fontSize: 13, fontWeight: "700" },

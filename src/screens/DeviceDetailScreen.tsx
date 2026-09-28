@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp, NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ApiError, getDevices, setDeviceLevel, toggleDevice } from "../api/client";
+import { ApiError, deleteDeviceApi, disconnectDevice, getDevices, setDeviceLevel, toggleDevice } from "../api/client";
 import type { Device } from "../api/types";
 import StatusPill from "../components/StatusPill";
 import { useAuth } from "../context/AuthContext";
@@ -12,6 +13,7 @@ import type { RootStackParamList } from "../navigation/types";
 import { colors, deviceMeta, ESP_STATUS_META, radius, spacing, STATUS_META, typography } from "../theme";
 
 type Props = NativeStackScreenProps<RootStackParamList, "DeviceDetail">;
+type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
@@ -26,11 +28,13 @@ function InfoRow({ label, value, mono }: { label: string; value: string; mono?: 
 
 export default function DeviceDetailScreen({ route }: Props) {
   const { deviceId } = route.params;
+  const navigation = useNavigation<Nav>();
   const { user } = useAuth();
   const canControl = user?.role === "admin";
   const [device, setDevice] = useState<Device | null>(null);
   const [sliderValue, setSliderValue] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
 
   async function load() {
     const devices = await getDevices();
@@ -84,6 +88,59 @@ export default function DeviceDetailScreen({ route }: Props) {
     }
   }
 
+  function handleEdit() {
+    navigation.navigate("DeviceForm", { deviceId: device!.id });
+  }
+
+  function handleDisconnect() {
+    Alert.alert(
+      "Ngắt kết nối ESP32?",
+      "Board sẽ được đánh dấu mất kết nối ngay. Cấu hình Chip ID vẫn giữ nguyên - board có thể tự ghép nối lại ở lần bấm Boot / heartbeat tiếp theo.",
+      [
+        { text: "Huỷ", style: "cancel" },
+        {
+          text: "Ngắt kết nối",
+          style: "destructive",
+          onPress: async () => {
+            setActionBusy(true);
+            try {
+              await disconnectDevice(device!.id);
+              load();
+            } catch (e) {
+              if (e instanceof ApiError) Alert.alert("Không thể ngắt kết nối", e.payload?.error || e.message);
+            } finally {
+              setActionBusy(false);
+            }
+          },
+        },
+      ]
+    );
+  }
+
+  function handleDelete() {
+    Alert.alert(
+      "Xoá thiết bị này?",
+      `"${device!.name}" sẽ bị xoá hẳn khỏi hệ thống. Board ESP32 gán cho thiết bị này (nếu có) sẽ cần gán lại. Thao tác này không thể hoàn tác.`,
+      [
+        { text: "Huỷ", style: "cancel" },
+        {
+          text: "Xoá",
+          style: "destructive",
+          onPress: async () => {
+            setActionBusy(true);
+            try {
+              await deleteDeviceApi(device!.id);
+              navigation.goBack();
+            } catch (e) {
+              setActionBusy(false);
+              if (e instanceof ApiError) Alert.alert("Không thể xoá", e.payload?.error || e.message);
+            }
+          },
+        },
+      ]
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -105,8 +162,10 @@ export default function DeviceDetailScreen({ route }: Props) {
         <View style={styles.card}>
           <View style={styles.toggleRow}>
             <View>
-              <Text style={styles.cardTitle}>Nguồn</Text>
-              <Text style={styles.cardSub}>{device.state ? "Đang bật" : "Đang tắt"}</Text>
+              <Text style={styles.cardTitle}>{device.type === "door" ? "Khoá cửa" : "Nguồn"}</Text>
+              <Text style={styles.cardSub}>
+                {device.type === "door" ? (device.state ? "Đang mở" : "Đã khoá") : device.state ? "Đang bật" : "Đang tắt"}
+              </Text>
             </View>
             {saving ? (
               <ActivityIndicator color={colors.accent} />
@@ -156,6 +215,31 @@ export default function DeviceDetailScreen({ route }: Props) {
           {device.error_reason ? <InfoRow label="Lý do lỗi" value={device.error_reason} /> : null}
         </View>
 
+        {canControl && (
+          <View style={styles.actionsRow}>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleEdit} disabled={actionBusy}>
+              <Ionicons name="create-outline" size={16} color={colors.text} />
+              <Text style={styles.actionBtnText}>Sửa</Text>
+            </TouchableOpacity>
+            {device.mac ? (
+              <TouchableOpacity style={styles.actionBtn} onPress={handleDisconnect} disabled={actionBusy}>
+                <Ionicons name="unlink-outline" size={16} color={colors.warn} />
+                <Text style={[styles.actionBtnText, { color: colors.warn }]}>Ngắt kết nối</Text>
+              </TouchableOpacity>
+            ) : null}
+            <TouchableOpacity style={styles.actionBtnDanger} onPress={handleDelete} disabled={actionBusy}>
+              {actionBusy ? (
+                <ActivityIndicator size="small" color={colors.bad} />
+              ) : (
+                <>
+                  <Ionicons name="trash-outline" size={16} color={colors.bad} />
+                  <Text style={[styles.actionBtnText, { color: colors.bad }]}>Xoá</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
         {!canControl && (
           <Text style={styles.viewOnlyNote}>Tài khoản của bạn chỉ có thể xem thông tin thiết bị này.</Text>
         )}
@@ -186,4 +270,8 @@ const styles = StyleSheet.create({
   infoValue: { color: colors.text, fontSize: 12.5, fontWeight: "600", maxWidth: "60%" },
   mono: { fontFamily: "monospace" },
   viewOnlyNote: { color: colors.textFaint, fontSize: 11.5, textAlign: "center", marginTop: spacing.sm },
+  actionsRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
+  actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingVertical: 12 },
+  actionBtnDanger: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderWidth: 1, borderColor: "rgba(248,113,113,0.35)", borderRadius: radius.sm, paddingVertical: 12 },
+  actionBtnText: { color: colors.text, fontSize: 12.5, fontWeight: "700" },
 });

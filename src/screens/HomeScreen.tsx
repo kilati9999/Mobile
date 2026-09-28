@@ -7,6 +7,7 @@ import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ApiError, getState, toggleDevice } from "../api/client";
 import type { Device } from "../api/types";
+import FireBanner from "../components/FireBanner";
 import KpiCard from "../components/KpiCard";
 import RoomSection from "../components/RoomSection";
 import { useAuth } from "../context/AuthContext";
@@ -39,11 +40,13 @@ export default function HomeScreen() {
   }
 
   const devicesBySite = new Map<string, Device[]>();
-  (data?.devices || []).forEach((d) => {
-    const list = devicesBySite.get(d.site_id) || [];
-    list.push(d);
-    devicesBySite.set(d.site_id, list);
-  });
+  (data?.devices || [])
+    .filter((d) => !!d.mac) // chỉ hiện thiết bị đã gán board ESP32 thật - không còn mô phỏng
+    .forEach((d) => {
+      const list = devicesBySite.get(d.site_id) || [];
+      list.push(d);
+      devicesBySite.set(d.site_id, list);
+    });
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -76,6 +79,8 @@ export default function HomeScreen() {
           </View>
         </LinearGradient>
 
+        <FireBanner />
+
         <View style={styles.body}>
           {data?.sites.map((site) => (
             <RoomSection
@@ -96,8 +101,10 @@ export default function HomeScreen() {
             </View>
           )}
 
-          {data && data.devices.length === 0 && (
-            <Text style={styles.empty}>Chưa có thiết bị nào ở vị trí bạn được xem.</Text>
+          {data && devicesBySite.size === 0 && (
+            <Text style={styles.empty}>
+              Chưa có thiết bị nào đã ghép nối ESP32{user?.role === "admin" ? " - vào tab Thiết bị để thêm." : "."}
+            </Text>
           )}
         </View>
       </ScrollView>

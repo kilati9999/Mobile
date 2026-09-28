@@ -1,4 +1,4 @@
-# Gesture Home (React Native / Expo)
+# SmartHome (React Native / Expo)
 
 App Android điều khiển thiết bị bằng cử chỉ tay - giao diện tham khảo các
 app điều khiển thiết bị thông minh nổi tiếng (Google Home, Apple Home,
@@ -115,29 +115,33 @@ src/
 
 ## Ghi chú
 
-## Ghép nối ESP32 lần đầu qua SoftAP (Board mới → tab Thiết bị)
+## Ghép nối ESP32 lần đầu (Board mới → tab Thiết bị → "+ Board mới")
 
-Ngoài luồng ghép nối cũ (board đã có sẵn WiFi, bấm Boot để `pair()` thẳng
-tới server), app giờ có thêm màn hình **"Thêm board ESP32"** (nút "+ Board
-mới" trên tab Thiết bị) dành cho board **hoàn toàn mới, chưa từng cấu hình
-WiFi** - dùng đúng kiểu SoftAP + captive portal như các app Tuya/Kasa/Google
-Home. Firmware ESP32 cần triển khai đúng hợp đồng sau khi đang ở chế độ AP
-(chưa có WiFi nhà, hoặc giữ nút BOOT vài giây để quay lại chế độ này):
+Firmware thực tế dùng thư viện **WiFiManager** (không phải API `/status`
++ `/configure` tự chế bàn đầu) - màn hình "Thêm board ESP32" trong app chỉ
+còn vai trò **hướng dẫn** (mở Cài đặt WiFi hộ, hiển thị danh sách "board
+đang chờ gán" để bấm gán), toàn bộ việc nhập WiFi nhà diễn ra trên trang
+cấu hình do chính board hiện ra (không phải màn hình trong app):
 
-- Phát WiFi tên `GestureHome-<6 ký tự cuối chip id>`, IP mặc định
-  `192.168.4.1` (mặc định của SoftAP trên ESP32).
-- `GET /status` → `{"chip_id": "AA:BB:CC:DD:EE:FF", "configured": false}`
-- `POST /configure` body JSON `{"ssid", "password", "server_url"}` →
-  `{"ok": true}`, sau đó ESP32 lưu lại (NVS/Preferences), ngắt AP, kết nối
-  WiFi nhà, rồi tự gọi `POST {server_url}/api/esp32/pair` với chip_id của
-  chính nó - **tái dùng đúng API pair() đã có sẵn**, không cần sửa gì bên
-  Flask. Sau khi pair xong, board sẽ xuất hiện ở mục "Board đang chờ gán"
-  trên tab Thiết bị như luồng cũ.
+1. Board chưa có WiFi tự phát AP tên `ESP32-Config-XXXX` (4 ký tự cuối
+   Chip ID), mật khẩu `12345678`, IP `192.168.4.1`.
+2. Người dùng nối điện thoại vào AP đó, mở trang cấu hình (captive portal
+   tự bật, hoặc tự vào `http://192.168.4.1`), chọn WiFi nhà + mật khẩu.
+3. Board tự kết nối WiFi nhà, rồi tự `POST {serverBaseUrl}/api/esp32/pair`
+   với `chip_id` của nó (địa chỉ server đã **hard-code sẵn trong firmware**,
+   biến `serverBaseUrl` - không truyền từ app).
+4. Cứ mỗi 7 giây board gọi `GET {serverBaseUrl}/api/esp32/{chip_id}/heartbeat`
+   để giữ trạng thái "Đã kết nối".
+5. Giữ nút BOOT 2-5 giây → board gọi `POST {serverBaseUrl}/api/esp32/unpair`
+   (ngắt kết nối thủ công, không xoá cấu hình WiFi). Giữ >5 giây → xoá hẳn
+   WiFi đã lưu, khởi động lại vào chế độ AP để cấu hình lại từ đầu.
 
-Trên ESP32 (Arduino), gợi ý dùng `WiFi.softAP(ssid)` + thư viện
-`ESPAsyncWebServer` (hoặc `WebServer` chuẩn) để dựng 2 endpoint trên, và
-`Preferences.h` để lưu SSID/mật khẩu/server_url qua các lần khởi động lại.
-
+**Chip ID** board dùng là chuỗi hex 12 ký tự từ `ESP.getEfuseMac()` (in ra
+Serial Monitor lúc khởi động, ví dụ `3C71BFA12345`) - **khác** với địa chỉ
+MAC WiFi (`WiFi.macAddress()`, có dấu hai chấm) cũng được gửi kèm trong
+request nhưng server không dùng tới. Khi cấu hình trước 1 thiết bị trên
+web/app (điền sẵn "Chip ID board ESP32"), phải dùng đúng giá trị Chip ID
+này để board tự khớp thẳng vào thiết bị đó thay vì rơi vào "chờ gán".
 
 
 - Level (độ sáng/tốc độ) điều khiển qua API mới `POST

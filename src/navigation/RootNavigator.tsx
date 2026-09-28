@@ -3,7 +3,9 @@ import React from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import DeviceDetailScreen from "../screens/DeviceDetailScreen";
-import HistoryScreen from "../screens/HistoryScreen";
+import DeviceFormScreen from "../screens/DeviceFormScreen";
+import FaceEnrollScreen from "../screens/FaceEnrollScreen";
+import LogsScreen from "../screens/LogsScreen";
 import LoginScreen from "../screens/LoginScreen";
 import ProvisionDeviceScreen from "../screens/ProvisionDeviceScreen";
 import ServerSetupScreen from "../screens/ServerSetupScreen";
@@ -48,11 +50,17 @@ export default function RootNavigator() {
             options={{ title: "Chi tiết thiết bị" }}
           />
           <Stack.Screen
+            name="DeviceForm"
+            component={DeviceFormScreen}
+            options={({ route }) => ({ title: route.params?.deviceId ? "Sửa thiết bị" : "Thêm thiết bị mới" })}
+          />
+          <Stack.Screen
             name="ProvisionDevice"
             component={ProvisionDeviceScreen}
             options={{ title: "Thêm board ESP32" }}
           />
-          <Stack.Screen name="History" component={HistoryScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="FaceEnroll" component={FaceEnrollScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Logs" component={LogsScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
         </>
       )}
