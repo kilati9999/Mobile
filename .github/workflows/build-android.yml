@@ -37,11 +37,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Cài EAS CLI
+       - name: Cài EAS CLI
         uses: expo/expo-github-action@v8
         with:
           eas-version: latest
-	  packager: npm
+          packager: npm
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Cài dependencies
