@@ -2,21 +2,12 @@
  * FaceEnrollScreen.tsx
  * ====================
  * Màn hình "Huấn luyện khuôn mặt tại chỗ" - hướng dẫn quay mặt qua 4 góc
- * cố định (chính diện, phải, trái, cúi xuống), MỖI GÓC có 1-2 giây đếm
- * ngược "giữ yên" để ảnh rõ nét hơn trước khi tự động chụp.
+ * cố định (chính diện, phải, trái, cúi xuống), MỖI GÓC có đếm ngược "giữ
+ * yên" trước khi tự động chụp. Đăng nhập bằng ĐÚNG tài khoản/mật khẩu hệ
+ * thống (không dán token thủ công) - xem useFaceAuth()/faceApi.ts.
  *
- * ĐÃ BỎ cơ chế tự động phát hiện "di chuyển quá nhanh" bằng cảm biến con
- * quay hồi chuyển (gyroscope) - trên thực tế cảm biến này có độ lệch nền
- * (bias) khác nhau tuỳ từng máy, khiến nhiều máy báo lỗi ngay cả khi giữ
- * điện thoại đứng yên tuyệt đối (không có cách hiệu chỉnh đơn giản, đáng
- * tin cậy cho mọi thiết bị). Thay vào đó, dùng cách ĐƠN GIẢN VÀ DỄ DÙNG
- * HƠN: đếm ngược trực quan để người dùng TỰ giữ yên theo nhịp, tự động
- * chụp khi đếm xong - không có bước "chấm điểm đúng/sai" nào có thể chặn
- * nhầm người dùng. Nếu ảnh bị mờ thật, người dùng có thể bấm "Làm lại từ
- * đầu" ở màn xác nhận cuối cùng sau khi xem trước.
- *
- * ⚠️ Gọi POST /register của Face Auth API (main.py, cổng 8000) - KHÔNG
- * phải server thiết bị routes.py/simulator.py (cổng 5050).
+ * ⚠️ Gọi POST /register của Face Auth API (main.py, cổng riêng - xem Cài
+ * đặt) - KHÔNG phải server thiết bị routes.py/simulator.py.
  */
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -24,13 +15,15 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { authHeaders, clearToken, getToken, saveToken } from "../api/authToken";
+import { FaceApiError, faceCheckName, faceRegister } from "../api/faceApi";
+import FaceLoginForm from "../components/FaceLoginForm";
+import { useFaceAuth } from "../hooks/useFaceAuth";
 import { getFaceApiUrl } from "../api/client";
 import { colors, radius, spacing, typography } from "../theme";
 
 const MIN_REGISTER_IMAGES = 5; // phải khớp MIN_REGISTER_IMAGES trong main.py
-
 const COUNTDOWN_SECONDS = 3; // đếm ngược "giữ yên" trước khi chụp mỗi góc
+const NAME_CHECK_DEBOUNCE_MS = 600;
 
 const POSES = [
   { key: "front", label: "Nhìn thẳng chính diện vào camera" },
@@ -44,11 +37,18 @@ type Stage = "form" | "counting" | "captured" | "review";
 
 export default function FaceEnrollScreen() {
   const navigation = useNavigation();
+  const { token, login, logout } = useFaceAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nameCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [name, setName] = useState("");
+  const [nameCheck, setNameCheck] = useState<{ checking: boolean; available: boolean | null; message: string | null }>({
+    checking: false,
+    available: null,
+    message: null,
+  });
   const [faceApiUrl, setFaceApiUrlState] = useState("");
   const [stage, setStage] = useState<Stage>("form");
   const [poseIdx, setPoseIdx] = useState(0);
@@ -57,32 +57,35 @@ export default function FaceEnrollScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [resultMsg, setResultMsg] = useState<ResultMsg>(null);
 
-  // Token lưu sẵn trong máy (AsyncStorage): undefined = đang đọc, null = chưa có
-  const [token, setToken] = useState<string | null | undefined>(undefined);
-  const [tokenInput, setTokenInput] = useState("");
-  const [tokenError, setTokenError] = useState<string | null>(null);
-
   useEffect(() => {
     getFaceApiUrl().then(setFaceApiUrlState);
-    getToken().then(setToken);
   }, []);
-
-  const handleSaveToken = useCallback(async () => {
-    if (!tokenInput.trim()) {
-      setTokenError("Vui lòng dán token vào ô trên.");
-      return;
-    }
-    await saveToken(tokenInput);
-    setToken(tokenInput.trim());
-    setTokenInput("");
-    setTokenError(null);
-  }, [tokenInput]);
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (nameCheckTimerRef.current) clearTimeout(nameCheckTimerRef.current);
     };
   }, []);
+
+  // Kiểm tra tên trùng NGAY khi người dùng gõ (debounce 600ms) - báo sớm
+  // thay vì để tới lúc quay xong 4 góc mới biết bị từ chối.
+  useEffect(() => {
+    if (nameCheckTimerRef.current) clearTimeout(nameCheckTimerRef.current);
+    if (!name.trim() || token == null) {
+      setNameCheck({ checking: false, available: null, message: null });
+      return;
+    }
+    nameCheckTimerRef.current = setTimeout(async () => {
+      setNameCheck((s) => ({ ...s, checking: true }));
+      try {
+        const result = await faceCheckName(name.trim());
+        setNameCheck({ checking: false, available: result.available, message: result.message });
+      } catch {
+        setNameCheck({ checking: false, available: null, message: null });
+      }
+    }, NAME_CHECK_DEBOUNCE_MS);
+  }, [name, token]);
 
   const currentPose = POSES[poseIdx];
 
@@ -129,13 +132,13 @@ export default function FaceEnrollScreen() {
   }, [stage, countdown, capturePose]);
 
   const handleBegin = useCallback(() => {
-    if (!name.trim()) return;
+    if (!name.trim() || nameCheck.available === false) return;
     setCollectedUris([]);
     setResultMsg(null);
     setPoseIdx(0);
     setCountdown(COUNTDOWN_SECONDS);
     setStage("counting");
-  }, [name]);
+  }, [name, nameCheck.available]);
 
   const handleRetakeAll = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -149,49 +152,24 @@ export default function FaceEnrollScreen() {
     if (collectedUris.length < MIN_REGISTER_IMAGES) return;
     setSubmitting(true);
     setResultMsg(null);
-
-    const form = new FormData();
-    form.append("name", name.trim());
-    collectedUris.forEach((uri, idx) => {
-      // @ts-expect-error - React Native FormData chấp nhận object {uri,name,type}, khác với DOM FormData chuẩn
-      form.append("images", { uri, name: `face_${idx}.jpg`, type: "image/jpeg" });
-    });
-
     try {
-      const res = await fetch(`${faceApiUrl}/register`, {
-        method: "POST",
-        body: form,
-        headers: {
-          // KHÔNG tự đặt "Content-Type": "multipart/form-data" thủ công -
-          // fetch/RN cần tự sinh boundary chính xác, tự đặt sẽ làm hỏng request.
-          Accept: "application/json",
-          ...(await authHeaders()),
-        },
-      });
-      const data = await res.json();
-
-      // Token sai/hết hạn -> xoá token đã lưu và quay lại màn nhập token
-      if (res.status === 401) {
-        await clearToken();
-        setToken(null);
-        setTokenError(data.detail || "Token không hợp lệ hoặc đã hết hạn - vui lòng nhập lại.");
+      const data = await faceRegister(name.trim(), collectedUris);
+      setResultMsg({ ok: true, text: `Đã đăng ký "${data.name}" với ${data.num_embeddings} vector khuôn mặt.` });
+    } catch (e) {
+      if (e instanceof FaceApiError && e.status === 401) {
+        await logout();
         setCollectedUris([]);
         setPoseIdx(0);
         setStage("form");
+        setSubmitting(false);
         return;
       }
-
-      if (res.ok && data.success) {
-        setResultMsg({ ok: true, text: `Đã đăng ký "${data.name}" với ${data.num_embeddings} vector khuôn mặt.` });
-      } else {
-        setResultMsg({ ok: false, text: data.detail || data.message || "Đăng ký thất bại - vui lòng thử lại." });
-      }
-    } catch (e) {
-      setResultMsg({ ok: false, text: `Không kết nối được tới Face API (${faceApiUrl}). Kiểm tra lại IP/cổng trong Cài đặt.` });
+      const text = e instanceof FaceApiError ? e.message : `Không kết nối được tới Face API (${faceApiUrl}). Kiểm tra lại IP/cổng trong Cài đặt.`;
+      setResultMsg({ ok: false, text });
     } finally {
       setSubmitting(false);
     }
-  }, [collectedUris, name, faceApiUrl]);
+  }, [collectedUris, name, faceApiUrl, logout]);
 
   // ==================== Xin quyền camera ====================
   if (!permission) {
@@ -213,7 +191,7 @@ export default function FaceEnrollScreen() {
     );
   }
 
-  // ==================== Chưa có token: nhập 1 lần, lưu lại dùng mãi ====================
+  // ==================== Chưa đăng nhập Face API ====================
   if (token === undefined) {
     return (
       <SafeAreaView style={styles.center}>
@@ -222,27 +200,7 @@ export default function FaceEnrollScreen() {
     );
   }
   if (token === null) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <Text style={styles.title}>Nhập token đăng nhập</Text>
-        <Text style={styles.subtitle}>
-          Dán token một lần duy nhất. Ứng dụng sẽ lưu lại trên máy và tự dùng cho các lần sau.
-        </Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Dán token vào đây"
-          placeholderTextColor={colors.textFaint}
-          value={tokenInput}
-          onChangeText={setTokenInput}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {tokenError ? <Text style={[styles.bodyText, styles.errorText]}>{tokenError}</Text> : null}
-        <TouchableOpacity style={styles.primaryBtn} onPress={handleSaveToken}>
-          <Text style={styles.primaryBtnText}>Lưu token</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
-    );
+    return <FaceLoginForm onSubmit={login} />;
   }
 
   // ==================== Màn hình xác nhận gửi (không cần camera nữa) ====================
@@ -303,8 +261,16 @@ export default function FaceEnrollScreen() {
               onChangeText={setName}
             />
             {!name.trim() ? <Text style={styles.hintText}>Nhập tên trước khi bắt đầu.</Text> : null}
+            {nameCheck.checking ? <Text style={styles.hintText}>Đang kiểm tra tên…</Text> : null}
+            {!nameCheck.checking && nameCheck.message ? (
+              <Text style={[styles.hintText, nameCheck.available === false && styles.errorText]}>{nameCheck.message}</Text>
+            ) : null}
             <Text style={styles.apiUrlText}>Face API: {faceApiUrl || "…"} (sửa ở tab Khác → Cài đặt)</Text>
-            <TouchableOpacity style={[styles.primaryBtn, !name.trim() && styles.primaryBtnDisabled]} onPress={handleBegin} disabled={!name.trim()}>
+            <TouchableOpacity
+              style={[styles.primaryBtn, (!name.trim() || nameCheck.available === false) && styles.primaryBtnDisabled]}
+              onPress={handleBegin}
+              disabled={!name.trim() || nameCheck.available === false}
+            >
               <Text style={styles.primaryBtnText}>Bắt đầu</Text>
             </TouchableOpacity>
           </SafeAreaView>

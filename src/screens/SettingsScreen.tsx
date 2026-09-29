@@ -3,7 +3,17 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { clearToken, getToken } from "../api/authToken";
-import { ApiError, apiMe, getFaceApiUrl, getServerUrl, setFaceApiUrl, setServerUrl, testFaceApiReachable } from "../api/client";
+import {
+  ApiError,
+  apiMe,
+  getFaceApiKey,
+  getFaceApiUrl,
+  getServerUrl,
+  setFaceApiKey,
+  setFaceApiUrl,
+  setServerUrl,
+  testFaceApiReachable,
+} from "../api/client";
 import { colors, radius, spacing, typography } from "../theme";
 
 export default function SettingsScreen() {
@@ -13,6 +23,7 @@ export default function SettingsScreen() {
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
   const [faceUrl, setFaceUrl] = useState("");
+  const [faceApiKey, setFaceApiKeyState] = useState("");
   const [faceSaving, setFaceSaving] = useState(false);
   const [faceTesting, setFaceTesting] = useState(false);
   const [faceMessage, setFaceMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -21,6 +32,7 @@ export default function SettingsScreen() {
   useEffect(() => {
     getServerUrl().then(setUrl);
     getFaceApiUrl().then(setFaceUrl);
+    getFaceApiKey().then(setFaceApiKeyState);
     getToken().then((t) => setHasToken(!!t));
   }, []);
 
@@ -67,8 +79,9 @@ export default function SettingsScreen() {
     }
     setFaceSaving(true);
     await setFaceApiUrl(faceUrl);
+    await setFaceApiKey(faceApiKey);
     setFaceSaving(false);
-    setFaceMessage({ text: "Đã lưu địa chỉ Face API.", ok: true });
+    setFaceMessage({ text: "Đã lưu cấu hình Face API.", ok: true });
   }
 
   async function onFaceTest() {
@@ -139,6 +152,16 @@ export default function SettingsScreen() {
           placeholderTextColor={colors.textFaint}
           style={styles.input}
         />
+        <Text style={styles.label}>API Key (tuỳ chọn - chỉ cần nếu Pi có đặt biến môi trường API_KEY)</Text>
+        <TextInput
+          value={faceApiKey}
+          onChangeText={setFaceApiKeyState}
+          autoCapitalize="none"
+          autoCorrect={false}
+          placeholder="Để trống nếu Pi không đặt API_KEY"
+          placeholderTextColor={colors.textFaint}
+          style={styles.input}
+        />
 
         {faceMessage ? (
           <View style={[styles.msgBox, { backgroundColor: faceMessage.ok ? colors.goodSoft : colors.badSoft }]}>
@@ -157,10 +180,12 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.tokenRow}>
-          <Text style={styles.tokenText}>Token Face API: {hasToken ? "Đã lưu" : "Chưa có (sẽ hỏi khi đăng ký khuôn mặt)"}</Text>
+          <Text style={styles.tokenText}>
+            Đăng nhập Face API: {hasToken ? "Đã đăng nhập" : "Chưa đăng nhập (sẽ hỏi khi vào Đăng ký/Xác thực khuôn mặt)"}
+          </Text>
           {hasToken ? (
             <TouchableOpacity onPress={onClearToken}>
-              <Text style={styles.tokenClear}>Xoá token</Text>
+              <Text style={styles.tokenClear}>Đăng xuất</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -207,4 +232,5 @@ const styles = StyleSheet.create({
   tokenRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: spacing.lg, gap: spacing.sm },
   tokenText: { color: colors.textDim, fontSize: 12.5, flex: 1 },
   tokenClear: { color: colors.bad, fontSize: 12.5, fontWeight: "700" },
+  label: { color: colors.textDim, fontSize: 11.5, marginBottom: 6, marginTop: spacing.xs },
 });

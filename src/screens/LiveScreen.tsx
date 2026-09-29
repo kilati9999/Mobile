@@ -29,19 +29,25 @@ function FaceEnrollPanel() {
       <View style={styles.enrollIconWrap}>
         <Ionicons name="person-add" size={26} color={colors.accent} />
       </View>
-      <Text style={styles.enrollTitle}>Huấn luyện khuôn mặt tại chỗ</Text>
+      <Text style={styles.enrollTitle}>Khuôn mặt & xác thực cửa</Text>
       <Text style={styles.enrollDesc}>
-        Chụp 5 ảnh khuôn mặt theo hướng dẫn để đăng ký người dùng mới, đồng bộ với hệ thống xác thực cửa.
+        Đăng ký khuôn mặt người dùng mới (đồng bộ với hệ thống xác thực cửa), hoặc thử xác thực ngay bằng camera điện
+        thoại.
       </Text>
-      {canEnroll ? (
-        <TouchableOpacity style={styles.enrollBtn} onPress={() => navigation.navigate("FaceEnroll")} activeOpacity={0.85}>
-          <Text style={styles.enrollBtnText}>Bắt đầu</Text>
+      <View style={styles.enrollBtnRow}>
+        {canEnroll ? (
+          <TouchableOpacity style={styles.enrollBtn} onPress={() => navigation.navigate("FaceEnroll")} activeOpacity={0.85}>
+            <Text style={styles.enrollBtnText}>Đăng ký mới</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.comingSoonChip}>
+            <Text style={styles.comingSoonText}>Chỉ admin mới đăng ký được</Text>
+          </View>
+        )}
+        <TouchableOpacity style={styles.enrollBtnOutline} onPress={() => navigation.navigate("FaceVerify")} activeOpacity={0.85}>
+          <Text style={styles.enrollBtnOutlineText}>Xác thực thử</Text>
         </TouchableOpacity>
-      ) : (
-        <View style={styles.comingSoonChip}>
-          <Text style={styles.comingSoonText}>Chỉ admin mới đăng ký được</Text>
-        </View>
-      )}
+      </View>
     </View>
   );
 }
@@ -117,8 +123,11 @@ const styles = StyleSheet.create({
   enrollDesc: { color: colors.textDim, fontSize: 12.5, lineHeight: 19, textAlign: "center", marginBottom: spacing.md },
   comingSoonChip: { backgroundColor: colors.cardAlt, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
   comingSoonText: { color: colors.textFaint, fontSize: 11, fontWeight: "700" },
-  enrollBtn: { backgroundColor: colors.accent, borderRadius: radius.sm, paddingHorizontal: 24, paddingVertical: 11 },
+  enrollBtnRow: { flexDirection: "row", gap: spacing.sm },
+  enrollBtn: { backgroundColor: colors.accent, borderRadius: radius.sm, paddingHorizontal: 20, paddingVertical: 11 },
   enrollBtnText: { color: "#04141c", fontSize: 13, fontWeight: "800" },
+  enrollBtnOutline: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 20, paddingVertical: 11 },
+  enrollBtnOutlineText: { color: colors.text, fontSize: 13, fontWeight: "700" },
 
   sectionHead: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: spacing.sm, marginBottom: spacing.sm },
   sectionTitle: { color: colors.text, fontSize: 13, fontWeight: "700" },

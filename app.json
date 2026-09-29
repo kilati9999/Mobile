@@ -21,9 +21,7 @@
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",
-        "CAMERA",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "CAMERA"
       ]
     },
     "extra": {
@@ -47,7 +45,6 @@
           "cameraPermission": "Cho phép SmartHome dùng camera để chụp ảnh khuôn mặt khi huấn luyện tại chỗ."
         }
       ]
-    ],
-    "owner": "kilati"
+    ]
   }
 }

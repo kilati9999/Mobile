@@ -48,6 +48,25 @@ export async function setFaceApiUrl(url: string): Promise<void> {
   await AsyncStorage.setItem(FACE_API_URL_KEY, trimmed);
 }
 
+// API_KEY tuỳ chọn của main.py (biến môi trường API_KEY trên Pi) - nếu
+// Pi có đặt, mọi request /register /verify /users /history phải kèm
+// header X-API-Key đúng giá trị đó. Để trống nếu Pi không đặt API_KEY.
+const FACE_API_KEY_KEY = "gesture-home:face-api-key";
+let cachedFaceApiKey: string | null = null;
+
+export async function getFaceApiKey(): Promise<string> {
+  if (cachedFaceApiKey !== null) return cachedFaceApiKey;
+  const stored = await AsyncStorage.getItem(FACE_API_KEY_KEY);
+  cachedFaceApiKey = stored || "";
+  return cachedFaceApiKey;
+}
+
+export async function setFaceApiKey(key: string): Promise<void> {
+  const trimmed = key.trim();
+  cachedFaceApiKey = trimmed;
+  await AsyncStorage.setItem(FACE_API_KEY_KEY, trimmed);
+}
+
 /** Kiểm tra Face API có phản hồi được không - KHÔNG biết trước main.py có
  * route gì ngoài /register, nên coi BẤT KỲ phản hồi HTTP nào (kể cả 404)
  * là "máy chủ có tồn tại và mạng thông" - chỉ lỗi mạng/timeout mới coi là

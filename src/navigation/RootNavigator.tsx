@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import DeviceDetailScreen from "../screens/DeviceDetailScreen";
 import DeviceFormScreen from "../screens/DeviceFormScreen";
 import FaceEnrollScreen from "../screens/FaceEnrollScreen";
+import FaceVerifyScreen from "../screens/FaceVerifyScreen";
 import LogsScreen from "../screens/LogsScreen";
 import LoginScreen from "../screens/LoginScreen";
 import ProvisionDeviceScreen from "../screens/ProvisionDeviceScreen";
@@ -60,6 +61,7 @@ export default function RootNavigator() {
             options={{ title: "Thêm board ESP32" }}
           />
           <Stack.Screen name="FaceEnroll" component={FaceEnrollScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="FaceVerify" component={FaceVerifyScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Logs" component={LogsScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
         </>

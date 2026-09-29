@@ -15,6 +15,7 @@ export type RootStackParamList = {
   DeviceForm: { deviceId?: string } | undefined;
   ProvisionDevice: undefined;
   FaceEnroll: undefined;
+  FaceVerify: undefined;
   Logs: undefined;
   Settings: undefined;
 };
