@@ -42,7 +42,8 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Cho phép SmartHome dùng camera để chụp ảnh khuôn mặt khi huấn luyện tại chỗ."
+          "cameraPermission": "Cho phép SmartHome dùng camera để quay video khuôn mặt khi huấn luyện tại chỗ.",
+          "microphonePermission": "Cần quyền micro để bật chế độ quay video (âm thanh không được sử dụng - đã tắt tiếng khi quay)."
         }
       ]
     ]

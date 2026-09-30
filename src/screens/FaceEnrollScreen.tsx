@@ -3,32 +3,49 @@
  * ====================
  * Màn hình "Huấn luyện khuôn mặt tại chỗ" - đúng theo bảng quy trình đã
  * thống nhất (6 bước, ~12 frame, KHÔNG dùng thời gian - chỉ chuyển bước
- * khi đã đạt đúng góc yêu cầu). Liên tục chụp + gọi POST /pose-check
- * (main.py, dùng heuristic 5-điểm landmark trong face_engine.py) để biết
- * góc hiện tại, tự lưu frame khi đạt và tự chuyển bước - không có bộ đếm
- * ngược nào cả.
+ * khi đã đạt đúng góc yêu cầu), giờ giống trải nghiệm app ngân hàng:
+ * nhận diện góc mặt NGAY TRÊN MÁY (ML Kit qua @infinitered/react-native-
+ * mlkit-face-detection), không phải gửi lên Pi hỏi như bản trước - nên
+ * phản hồi gần như tức thời, không có độ trễ mạng.
  *
- * ⚠️ Yaw/pitch từ /pose-check là ước lượng hình học từ 5 landmark, CHƯA
- * hiệu chỉnh camera thật - nếu khi test thấy chiều trái/phải bị ngược
- * (do camera trước có thể lật ảnh), chỉ cần đổi dấu điều kiện ở bước
- * "left"/"right" trong POSES bên dưới, không cần đổi gì khác.
+ * Cơ chế: chụp ảnh liên tục (rất nhanh, không cần chờ mạng) -> phân tích
+ * NGAY trên máy bằng useFacesInPhoto() -> đạt góc thì lưu + chụp tiếp
+ * ảnh cho bước kế, chưa đạt thì chụp lại ngay lập tức. Camera vẫn hiển
+ * thị liên tục (preview sống), tạo cảm giác "quay" mượt dù bên dưới là
+ * các lần chụp rất nhanh nối tiếp nhau.
+ *
+ * ⚠️ headEulerAngleY (yaw)/headEulerAngleX (pitch) là tên field CHUẨN
+ * của Google ML Kit Face Detection - nếu bản thư viện bọc lại tên khác,
+ * chỉ cần sửa trong extractPose() bên dưới, không cần đổi gì khác. Cũng
+ * cần xác nhận ngưỡng MOTION_THRESHOLD... à không, ở đây không dùng
+ * ngưỡng chuyển động nữa (khác bản trước) - chỉ cần đúng góc là được.
  */
 import { Ionicons } from "@expo/vector-icons";
+import { useFacesInPhoto } from "@infinitered/react-native-mlkit-face-detection";
 import { useNavigation } from "@react-navigation/native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getFaceApiUrl } from "../api/client";
-import { FaceApiError, faceCheckName, facePoseCheck, faceRegister } from "../api/faceApi";
+import { FaceApiError, faceCheckName, faceRegister } from "../api/faceApi";
 import FaceLoginForm from "../components/FaceLoginForm";
 import { useFaceAuth } from "../hooks/useFaceAuth";
 import { colors, radius, spacing, typography } from "../theme";
 
 const MIN_REGISTER_IMAGES = 5; // phải khớp MIN_REGISTER_IMAGES trong main.py
 const NAME_CHECK_DEBOUNCE_MS = 600;
-const LOOP_DELAY_MS = 150; // nghỉ giữa 2 lần chụp thử (tránh chụp liên tục quá nhanh)
-const AFTER_ACCEPT_DELAY_MS = 500; // nghỉ sau khi 1 frame đạt (đỡ chụp trùng gần như y hệt)
+const RETRY_DELAY_MS = 60; // nghỉ rất ngắn giữa 2 lần chụp thử (xử lý cục bộ nên có thể nhanh)
+const AFTER_ACCEPT_DELAY_MS = 350; // nghỉ sau khi 1 frame đạt (đỡ lấy trùng gần như y hệt)
+
+/** Lấy (yaw, pitch) từ 1 Face do useFacesInPhoto() trả về. Tách riêng
+ * hàm này để nếu tên field thực tế của thư viện khác chuẩn ML Kit, chỉ
+ * cần sửa đúng 2 dòng bên dưới. */
+function extractPose(face: any): { yaw: number; pitch: number } {
+  const yaw = face?.headEulerAngleY ?? face?.yaw ?? 0;
+  const pitch = face?.headEulerAngleX ?? face?.pitch ?? 0;
+  return { yaw, pitch };
+}
 
 interface PoseStep {
   key: string;
@@ -105,7 +122,7 @@ const POSES: PoseStep[] = [
     label: "Nhìn thẳng, chớp mắt",
     framesNeeded: 1,
     check: (yaw, pitch) => Math.abs(yaw) <= 10 && Math.abs(pitch) <= 10,
-    hint: (yaw, pitch, faceFound) => (!faceFound ? "Đưa mặt vào giữa khung hình" : "Nhìn thẳng rồi chớp mắt tự nhiên"),
+    hint: (_yaw, _pitch, faceFound) => (!faceFound ? "Đưa mặt vào giữa khung hình" : "Nhìn thẳng rồi chớp mắt tự nhiên"),
   },
 ];
 const TOTAL_FRAMES = POSES.reduce((s, p) => s + p.framesNeeded, 0);
@@ -134,10 +151,13 @@ export default function FaceEnrollScreen() {
   const [wantsGlassesRound, setWantsGlassesRound] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [resultMsg, setResultMsg] = useState<ResultMsg>(null);
+  const [photoUri, setPhotoUri] = useState<string | undefined>(undefined);
 
-  // Refs để vòng lặp chụp liên tục đọc/ghi trạng thái mới nhất ngay lập
-  // tức - state React cập nhật bất đồng bộ nên không dùng trực tiếp được
-  // bên trong vòng lặp while.
+  const { faces, status } = useFacesInPhoto(photoUri);
+
+  // Refs để logic bên trong callback/effect luôn đọc được giá trị MỚI
+  // NHẤT ngay lập tức (state React cập nhật bất đồng bộ nên không dùng
+  // trực tiếp state được ở những chỗ cần phản ứng tức thì).
   const runningRef = useRef(false);
   const stepIdxRef = useRef(0);
   const stepFramesRef = useRef(0);
@@ -174,79 +194,79 @@ export default function FaceEnrollScreen() {
     }, NAME_CHECK_DEBOUNCE_MS);
   }, [name, token]);
 
-  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-  // Vòng lặp chính: chụp thử -> hỏi /pose-check -> đạt góc thì lưu +
-  // tăng đếm -> đủ frame thì qua bước kế -> KHÔNG có bước nào tự chuyển
-  // theo thời gian, chỉ chuyển khi thật sự đạt góc.
-  const runCaptureLoop = useCallback(async () => {
-    runningRef.current = true;
-    while (runningRef.current) {
-      if (!cameraRef.current) {
-        await sleep(LOOP_DELAY_MS);
-        continue;
+  const captureNext = useCallback(async (delayMs = 0) => {
+    if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
+    if (!runningRef.current || !cameraRef.current) return;
+    try {
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.6, skipProcessing: true });
+      if (!runningRef.current) return;
+      if (photo?.uri) {
+        setPhotoUri(photo.uri);
+      } else {
+        captureNext(RETRY_DELAY_MS);
       }
-      let photo;
-      try {
-        photo = await cameraRef.current.takePictureAsync({ quality: 0.7, skipProcessing: true });
-      } catch {
-        await sleep(LOOP_DELAY_MS);
-        continue;
-      }
-      if (!runningRef.current) break;
-      if (!photo?.uri) {
-        await sleep(LOOP_DELAY_MS);
-        continue;
-      }
-
-      try {
-        const pose = await facePoseCheck(photo.uri);
-        if (!runningRef.current) break;
-
-        const step = POSES[stepIdxRef.current];
-        setLiveHint(step.hint(pose.yaw, pose.pitch, pose.face_found));
-
-        if (pose.face_found && step.check(pose.yaw, pose.pitch)) {
-          stepFramesRef.current += 1;
-          collectedRef.current.push(photo.uri);
-          setStepFrames(stepFramesRef.current);
-          setCollectedUris([...collectedRef.current]);
-
-          if (stepFramesRef.current >= step.framesNeeded) {
-            const next = stepIdxRef.current + 1;
-            if (next >= POSES.length) {
-              runningRef.current = false;
-              setStage("review");
-              return;
-            }
-            stepIdxRef.current = next;
-            stepFramesRef.current = 0;
-            setStepIdx(next);
-            setStepFrames(0);
-          }
-          await sleep(AFTER_ACCEPT_DELAY_MS);
-        }
-      } catch {
-        // lỗi mạng tạm thời khi gọi /pose-check - bỏ qua, thử lại vòng sau
-        setLiveHint("Không kết nối được Face API, đang thử lại…");
-      }
-      await sleep(LOOP_DELAY_MS);
+    } catch {
+      if (runningRef.current) captureNext(RETRY_DELAY_MS);
     }
   }, []);
+
+  // Chạy MỖI KHI có kết quả phân tích mới (ML Kit xử lý xong ảnh vừa
+  // chụp) - đạt góc thì lưu + tăng đếm/qua bước, chưa đạt thì chụp lại
+  // ngay. KHÔNG có bước nào tự chuyển theo thời gian.
+  useEffect(() => {
+    if (!runningRef.current || !photoUri) return;
+    if (status !== "success" && status !== "error") return; // đang phân tích dở, đợi
+
+    const step = POSES[stepIdxRef.current];
+    const face = faces && faces.length > 0 ? faces[0] : null;
+
+    if (face) {
+      const { yaw, pitch } = extractPose(face);
+      setLiveHint(step.hint(yaw, pitch, true));
+
+      if (step.check(yaw, pitch)) {
+        stepFramesRef.current += 1;
+        collectedRef.current.push(photoUri);
+        setStepFrames(stepFramesRef.current);
+        setCollectedUris([...collectedRef.current]);
+
+        if (stepFramesRef.current >= step.framesNeeded) {
+          const next = stepIdxRef.current + 1;
+          if (next >= POSES.length) {
+            runningRef.current = false;
+            setStage("review");
+            return;
+          }
+          stepIdxRef.current = next;
+          stepFramesRef.current = 0;
+          setStepIdx(next);
+          setStepFrames(0);
+        }
+        captureNext(AFTER_ACCEPT_DELAY_MS);
+        return;
+      }
+    } else {
+      setLiveHint(step.hint(0, 0, false));
+    }
+
+    captureNext(RETRY_DELAY_MS);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, photoUri]);
 
   const handleBegin = useCallback(() => {
     if (!name.trim() || nameCheck.available === false) return;
     stepIdxRef.current = 0;
     stepFramesRef.current = 0;
     collectedRef.current = [];
+    runningRef.current = true;
     setStepIdx(0);
     setStepFrames(0);
     setCollectedUris([]);
     setResultMsg(null);
     setLiveHint("Chuẩn bị…");
     setStage("capturing");
-    runCaptureLoop();
-  }, [name, nameCheck.available, runCaptureLoop]);
+    captureNext();
+  }, [name, nameCheck.available, captureNext]);
 
   // Quay thêm 1 lượt (đổi kính) - GIỮ nguyên frame đã có, chạy lại đúng
   // 6 bước để lấy thêm 12 frame nữa (tăng đa dạng embedding khi người
@@ -254,6 +274,7 @@ export default function FaceEnrollScreen() {
   const handleExtraRound = useCallback(() => {
     stepIdxRef.current = 0;
     stepFramesRef.current = 0;
+    runningRef.current = true;
     // KHÔNG reset collectedRef - cộng dồn vào ảnh đã chụp lượt trước
     setStepIdx(0);
     setStepFrames(0);
@@ -261,8 +282,8 @@ export default function FaceEnrollScreen() {
     setResultMsg(null);
     setLiveHint("Chuẩn bị…");
     setStage("capturing");
-    runCaptureLoop();
-  }, [runCaptureLoop]);
+    captureNext();
+  }, [captureNext]);
 
   const handleCancelCapture = useCallback(() => {
     runningRef.current = false;
