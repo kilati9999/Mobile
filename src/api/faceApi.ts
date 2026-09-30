@@ -55,6 +55,12 @@ export interface FaceCheckNameResult {
   message: string;
 }
 
+export interface PoseCheckResult {
+  face_found: boolean;
+  yaw: number; // độ - dương = quay phải, âm = quay trái (theo quy ước /pose-check)
+  pitch: number; // độ - dương = cúi, âm = ngẩng
+}
+
 async function baseHeaders(needAuth: boolean): Promise<Record<string, string>> {
   const headers: Record<string, string> = { Accept: "application/json" };
   const apiKey = await getFaceApiKey();
@@ -107,6 +113,22 @@ export async function faceCheckName(name: string): Promise<FaceCheckNameResult> 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) return handle401AndThrow(res, data);
   return data as FaceCheckNameResult;
+}
+
+/** Gọi liên tục (không theo mốc thời gian) trong lúc hướng dẫn người
+ * dùng xoay đầu - CHỈ 1 ảnh mỗi lần, KHÔNG raise lỗi khi chưa thấy mặt
+ * (đang chỉnh tư thế là bình thường). Khác /verify (cần cả chùm ảnh). */
+export async function facePoseCheck(imageUri: string): Promise<PoseCheckResult> {
+  const base = await getFaceApiUrl();
+  const form = new FormData();
+  // @ts-expect-error - React Native FormData chấp nhận object {uri,name,type}, khác với DOM FormData chuẩn
+  form.append("image", { uri: imageUri, name: "pose.jpg", type: "image/jpeg" });
+
+  const headers = await baseHeaders(true);
+  const res = await fetch(`${base}/pose-check`, { method: "POST", body: form, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return handle401AndThrow(res, data);
+  return data as PoseCheckResult;
 }
 
 export async function faceRegister(name: string, imageUris: string[]): Promise<FaceRegisterResult> {
