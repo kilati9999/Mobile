@@ -40,7 +40,7 @@ jobs:
           java-version: 17
 
       - name: Cài EAS CLI
-        run: npm install -g eas-cli
+        run: npm install -g eas-cli --prefer-online
 
       - name: Cài dependencies
         run: npm ci
