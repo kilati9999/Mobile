@@ -4,3 +4,14 @@ dist/
 web-build/
 *.log
 .DS_Store
+
+# Thư mục native sinh ra bởi "expo prebuild" - EAS tự tạo lại khi build
+/android
+/ios
+
+# Thông tin bí mật
+.env
+.env.*
+*.jks
+*.keystore
+credentials.json

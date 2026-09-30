@@ -215,7 +215,7 @@ export default function FaceEnrollScreen() {
   // ngay. KHÔNG có bước nào tự chuyển theo thời gian.
   useEffect(() => {
     if (!runningRef.current || !photoUri) return;
-    if (status !== "success" && status !== "error") return; // đang phân tích dở, đợi
+    if (status !== "done" && status !== "error") return; // đang phân tích dở, đợi
 
     const step = POSES[stepIdxRef.current];
     const face = faces && faces.length > 0 ? faces[0] : null;

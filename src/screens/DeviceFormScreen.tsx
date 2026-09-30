@@ -1,5 +1,5 @@
-import { useNavigation, useRoute } from "@react-navigation/native";
-import type { NativeStackNavigationProp, NativeStackRouteProp } from "@react-navigation/native-stack";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,7 +10,7 @@ import type { RootStackParamList } from "../navigation/types";
 import { colors, DEVICE_TYPE_META, radius, spacing, typography } from "../theme";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-type Route = NativeStackRouteProp<RootStackParamList, "DeviceForm">;
+type Route = RouteProp<RootStackParamList, "DeviceForm">;
 
 export default function DeviceFormScreen() {
   const navigation = useNavigation<Nav>();

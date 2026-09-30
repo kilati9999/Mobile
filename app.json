@@ -2,7 +2,7 @@
   "expo": {
     "name": "SmartHome",
     "slug": "gesture-home",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -22,7 +22,8 @@
         "INTERNET",
         "ACCESS_NETWORK_STATE",
         "CAMERA"
-      ]
+      ],
+      "versionCode": 2
     },
     "extra": {
       "defaultServerUrl": "http://10.0.2.2:5050",
@@ -42,10 +43,11 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Cho phép SmartHome dùng camera để quay video khuôn mặt khi huấn luyện tại chỗ.",
-          "microphonePermission": "Cần quyền micro để bật chế độ quay video (âm thanh không được sử dụng - đã tắt tiếng khi quay)."
+          "cameraPermission": "Cho phép SmartHome dùng camera để chụp ảnh khuôn mặt khi đăng ký và xác thực.",
+          "recordAudioAndroid": false
         }
       ]
-    ]
+    ],
+    "owner": "kilati"
   }
 }

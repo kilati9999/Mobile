@@ -91,6 +91,7 @@ export interface SensorSite {
   humidity: number;
   gas: number;
   fire_alert: boolean;
+  source?: "real" | "sim" | string;
   updated_at: string | null;
   history: { time: string; temperature: number; humidity: number; gas: number }[];
 }

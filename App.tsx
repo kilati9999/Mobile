@@ -1,4 +1,4 @@
-import { FaceDetectionProvider } from "@infinitered/react-native-mlkit-face-detection";
+import { RNMLKitFaceDetectionContextProvider } from "@infinitered/react-native-mlkit-face-detection";
 import { NavigationContainer, DarkTheme } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import React from "react";
@@ -23,12 +23,12 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <FaceDetectionProvider>
+        <RNMLKitFaceDetectionContextProvider options={{ performanceMode: "accurate" }}>
           <NavigationContainer theme={navTheme}>
             <StatusBar style="light" />
             <RootNavigator />
           </NavigationContainer>
-        </FaceDetectionProvider>
+        </RNMLKitFaceDetectionContextProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );
