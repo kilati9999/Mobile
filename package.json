@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.0",
+    "@infinitered/react-native-mlkit-core": "2.1.0",
     "@infinitered/react-native-mlkit-face-detection": "~2.0.1",
     "@react-native-async-storage/async-storage": "1.23.1",
     "@react-native-community/slider": "4.5.2",

@@ -22,8 +22,7 @@
         "INTERNET",
         "ACCESS_NETWORK_STATE",
         "CAMERA"
-      ],
-      "versionCode": 2
+      ]
     },
     "extra": {
       "defaultServerUrl": "http://10.0.2.2:5050",
