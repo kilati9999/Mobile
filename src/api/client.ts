@@ -201,15 +201,15 @@ export function getPendingBoards(): Promise<PendingBoard[]> {
   return request<PendingBoard[]>("/api/esp32/pending");
 }
 
-export function assignPendingBoard(chipId: string, deviceId: string): Promise<{ devices: Device[]; pending: PendingBoard[] }> {
-  return request(`/api/esp32/pending/${encodeURIComponent(chipId)}/assign`, {
+export function assignPendingBoard(key: string, deviceId: string): Promise<{ devices: Device[]; pending: PendingBoard[] }> {
+  return request(`/api/esp32/pending/${encodeURIComponent(key)}/assign`, {
     method: "POST",
     body: JSON.stringify({ device_id: deviceId }),
   });
 }
 
-export function discardPendingBoard(chipId: string): Promise<{ pending: PendingBoard[] }> {
-  return request(`/api/esp32/pending/${encodeURIComponent(chipId)}/discard`, { method: "POST" });
+export function discardPendingBoard(key: string): Promise<{ pending: PendingBoard[] }> {
+  return request(`/api/esp32/pending/${encodeURIComponent(key)}/discard`, { method: "POST" });
 }
 
 export interface CreateDeviceInput {
@@ -218,6 +218,8 @@ export interface CreateDeviceInput {
   site_id: string;
   mac?: string | null;
   assigned_user?: string | null;
+  conn_type?: "http" | "mqtt";
+  mqtt_slot?: string | null;
 }
 
 export function createDevice(input: CreateDeviceInput): Promise<{ device_id: string; devices: Device[] }> {

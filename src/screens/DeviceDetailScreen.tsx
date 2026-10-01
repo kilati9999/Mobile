@@ -209,7 +209,13 @@ export default function DeviceDetailScreen({ route }: Props) {
         <View style={styles.card}>
           <InfoRow label="Người phụ trách" value={device.assigned_user || "Chưa gán"} />
           <InfoRow label="MAC / Chip ID ESP32" value={device.mac || "Chưa gán"} mono />
-          <InfoRow label="Địa chỉ IP" value={device.ip || "—"} mono />
+          {device.mac ? (
+            <InfoRow
+              label="Kiểu kết nối"
+              value={device.conn_type === "mqtt" ? `MQTT (relay: ${device.mqtt_slot})` : "HTTP (pair/heartbeat)"}
+            />
+          ) : null}
+          <InfoRow label="Địa chỉ IP" value={device.ip || (device.conn_type === "mqtt" ? "Qua broker MQTT" : "—")} mono />
           <InfoRow label="Nguồn điện" value={device.power_source + (device.battery !== null ? ` · ${device.battery}%` : "")} />
           <InfoRow label="Cập nhật lúc" value={device.last_seen || "—"} mono />
           {device.error_reason ? <InfoRow label="Lý do lỗi" value={device.error_reason} /> : null}

@@ -32,6 +32,8 @@ export interface Device {
   esp_status: "connected" | "disconnected" | "unconfigured";
   status: "ok" | "power_off" | "offline" | "error";
   status_label: string;
+  conn_type: "http" | "mqtt";
+  mqtt_slot: string | null;
 }
 
 export interface Site {
@@ -113,7 +115,10 @@ export interface Account {
 }
 
 export interface PendingBoard {
+  key: string; // dùng để assign/discard - với board HTTP = chip_id, với board MQTT = "chip_id::slot"
   chip_id: string;
+  slot: string | null; // "light" | "fan" ... - chỉ có ở board MQTT (1 chip có thể nhiều relay độc lập)
+  transport: "http" | "mqtt";
   ip: string | null;
   status: "connected" | "disconnected";
   first_seen: string;

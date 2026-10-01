@@ -52,7 +52,7 @@ function PendingRow({
     if (!selectedDevice) return;
     setBusy(true);
     try {
-      await assignPendingBoard(board.chip_id, selectedDevice);
+      await assignPendingBoard(board.key, selectedDevice);
       onAssigned();
     } catch (e) {
       // im lặng - danh sách sẽ tự làm mới ở vòng poll sau
@@ -74,8 +74,15 @@ function PendingRow({
     setBusy(true);
     try {
       // create_device() đã tự bỏ board này khỏi danh sách chờ gán khi mac
-      // khớp - không cần gọi assign() thêm.
-      await createDevice({ name: newName.trim(), type: newType, site_id: newSite, mac: board.chip_id });
+      // (và slot, với board MQTT) khớp - không cần gọi assign() thêm.
+      await createDevice({
+        name: newName.trim(),
+        type: newType,
+        site_id: newSite,
+        mac: board.chip_id,
+        conn_type: board.transport,
+        mqtt_slot: board.slot,
+      });
       onAssigned();
     } catch (e: any) {
       setErrorMsg(e?.message || "Không thể tạo thiết bị, thử lại.");
@@ -87,7 +94,7 @@ function PendingRow({
   async function onDiscard() {
     setBusy(true);
     try {
-      await discardPendingBoard(board.chip_id);
+      await discardPendingBoard(board.key);
       onAssigned();
     } finally {
       setBusy(false);
@@ -97,9 +104,19 @@ function PendingRow({
   return (
     <View style={styles.pendingRow}>
       <View style={styles.pendingInfo}>
-        <Text style={styles.pendingChip}>{board.chip_id}</Text>
+        <View style={styles.pendingChipRow}>
+          <Text style={styles.pendingChip}>{board.chip_id}</Text>
+          <View style={[styles.transportBadge, board.transport === "mqtt" && styles.transportBadgeMqtt]}>
+            <Text style={styles.transportBadgeText}>{board.transport === "mqtt" ? "MQTT" : "HTTP"}</Text>
+          </View>
+          {board.slot ? (
+            <View style={styles.slotBadge}>
+              <Text style={styles.slotBadgeText}>relay: {board.slot}</Text>
+            </View>
+          ) : null}
+        </View>
         <Text style={styles.pendingSub}>
-          IP {board.ip || "—"} · thấy lần cuối {board.last_seen}
+          {board.transport === "mqtt" ? "Qua broker MQTT" : `IP ${board.ip || "—"}`} · thấy lần cuối {board.last_seen}
         </Text>
       </View>
 
@@ -236,7 +253,7 @@ export default function ProvisionDeviceScreen() {
             <Text style={styles.emptyPending}>Chưa thấy board nào chờ gán…</Text>
           ) : (
             (data?.pending || []).map((b) => (
-              <PendingRow key={b.chip_id} board={b} devices={data?.devices || []} sites={data?.sites || []} onAssigned={refresh} />
+              <PendingRow key={b.key} board={b} devices={data?.devices || []} sites={data?.sites || []} onAssigned={refresh} />
             ))
           )}
         </InfoCard>
@@ -265,8 +282,14 @@ const styles = StyleSheet.create({
 
   pendingRow: { backgroundColor: colors.cardAlt, borderRadius: radius.sm, borderWidth: 1, borderColor: "rgba(251,191,36,0.3)", padding: spacing.md, marginTop: spacing.sm },
   pendingInfo: { marginBottom: spacing.sm },
+  pendingChipRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
   pendingChip: { color: colors.warn, fontSize: 13, fontWeight: "700", fontFamily: "monospace" },
   pendingSub: { color: colors.textFaint, fontSize: 11, marginTop: 2 },
+  transportBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.pill, backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border },
+  transportBadgeMqtt: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  transportBadgeText: { color: colors.textDim, fontSize: 9.5, fontWeight: "800" },
+  slotBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: radius.pill, backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border },
+  slotBadgeText: { color: colors.textDim, fontSize: 9.5, fontWeight: "700", fontFamily: "monospace" },
   pendingLabel: { color: colors.textDim, fontSize: 11, fontWeight: "600", marginBottom: 6 },
   deviceChipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: spacing.sm },
   modeTabs: { flexDirection: "row", gap: 6, marginBottom: spacing.sm },
