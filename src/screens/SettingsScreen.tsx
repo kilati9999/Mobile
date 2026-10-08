@@ -106,7 +106,7 @@ export default function SettingsScreen() {
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
-          placeholder="http://192.168.1.10:5050"
+          placeholder="http://192.168.1.10:5000"
           placeholderTextColor={colors.textFaint}
           style={styles.input}
         />
@@ -129,10 +129,10 @@ export default function SettingsScreen() {
 
         <Text style={styles.hint}>
           Cùng WiFi: dùng địa chỉ IP LAN của máy tính (trên máy ảo Android, dùng{" "}
-          <Text style={styles.mono}>http://10.0.2.2:5050</Text>). Ở xa, không cùng mạng: cài Tailscale trên cả 2
+          <Text style={styles.mono}>http://10.0.2.2:5000</Text>). Ở xa, không cùng mạng: cài Tailscale trên cả 2
           thiết bị (cùng tailnet), rồi dùng địa chỉ Tailscale của máy chủ, ví dụ{" "}
-          <Text style={styles.mono}>http://100.101.102.103:5050</Text> hoặc{" "}
-          <Text style={styles.mono}>http://may-tinh.tailxxxx.ts.net:5050</Text>.
+          <Text style={styles.mono}>http://100.101.102.103:5000</Text> hoặc{" "}
+          <Text style={styles.mono}>http://may-tinh.tailxxxx.ts.net:5000</Text>.
         </Text>
 
         <View style={styles.divider} />

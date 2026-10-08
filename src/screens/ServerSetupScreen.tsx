@@ -8,7 +8,7 @@ import { colors, radius, spacing, typography } from "../theme";
 
 export default function ServerSetupScreen() {
   const { refreshServerConfigured } = useAuth();
-  const [url, setUrl] = useState("http://192.168.1.10:5050");
+  const [url, setUrl] = useState("http://192.168.1.10:5000");
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -52,21 +52,21 @@ export default function ServerSetupScreen() {
           <Text style={styles.title}>Nhập địa chỉ server{"\n"}Gesture Control</Text>
           <Text style={styles.desc}>
             Đây là địa chỉ IP LAN + cổng của máy tính đang chạy server Flask (Gesture Control Web UI). Ví dụ:{" "}
-            <Text style={styles.mono}>http://192.168.1.10:5050</Text>. Nếu dùng máy ảo Android trên cùng máy tính, dùng{" "}
-            <Text style={styles.mono}>http://10.0.2.2:5050</Text>.
+            <Text style={styles.mono}>http://192.168.1.10:5000</Text>. Nếu dùng máy ảo Android trên cùng máy tính, dùng{" "}
+            <Text style={styles.mono}>http://10.0.2.2:5000</Text>.
           </Text>
           <Text style={styles.desc}>
             Muốn dùng ở xa (không cùng WiFi)? Cài{" "}
             <Text style={styles.mono}>Tailscale</Text> trên cả máy chạy server lẫn điện thoại, đăng nhập chung 1
             tailnet, rồi nhập địa chỉ Tailscale của máy chủ, ví dụ{" "}
-            <Text style={styles.mono}>http://100.101.102.103:5050</Text> hoặc tên MagicDNS như{" "}
-            <Text style={styles.mono}>http://may-tinh.tailxxxx.ts.net:5050</Text>.
+            <Text style={styles.mono}>http://100.101.102.103:5000</Text> hoặc tên MagicDNS như{" "}
+            <Text style={styles.mono}>http://may-tinh.tailxxxx.ts.net:5000</Text>.
           </Text>
 
           <TextInput
             value={url}
             onChangeText={setUrl}
-            placeholder="http://192.168.1.10:5050"
+            placeholder="http://192.168.1.10:5000"
             placeholderTextColor={colors.textFaint}
             autoCapitalize="none"
             autoCorrect={false}

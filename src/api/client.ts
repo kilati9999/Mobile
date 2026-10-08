@@ -7,7 +7,7 @@ const SERVER_URL_KEY = "gesture-home:server-url";
 let cachedServerUrl: string | null = null;
 
 function defaultServerUrl(): string {
-  return (Constants.expoConfig?.extra?.defaultServerUrl as string) || "http://10.0.2.2:5050";
+  return (Constants.expoConfig?.extra?.defaultServerUrl as string) || "http://10.0.2.2:5000";
 }
 
 export async function getServerUrl(): Promise<string> {

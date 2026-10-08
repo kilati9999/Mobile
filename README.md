@@ -48,8 +48,8 @@ npm install
 4. Quét mã QR bằng app **Expo Go** trên điện thoại (điện thoại phải cùng
    mạng Wi-Fi với máy tính).
 5. Lần đầu mở app, nhập địa chỉ máy chủ dạng
-   `http://192.168.1.10:5050` (đúng IP + cổng ở bước 2). Nếu dùng máy ảo
-   Android trên cùng máy tính chạy server, dùng `http://10.0.2.2:5050`
+   `http://192.168.1.10:5000` (đúng IP + cổng ở bước 2). Nếu dùng máy ảo
+   Android trên cùng máy tính chạy server, dùng `http://10.0.2.2:5000`
    thay vì `127.0.0.1`.
 6. Đăng nhập bằng tài khoản có sẵn trên web (`admin` / `admin123`,
    `khach_q1` / `q1123`, ...).
@@ -87,8 +87,8 @@ trên WireGuard) giúp các thiết bị "nhìn thấy nhau" qua một địa ch
 4. Chạy server Flask như bình thường (`python run.py`, đã bind
    `0.0.0.0` nên tự động lắng nghe luôn trên địa chỉ Tailscale).
 5. Trong app, vào **Cài đặt** (hoặc màn hình nhập địa chỉ lần đầu), nhập
-   `http://100.x.y.z:5050` (thay bằng IP Tailscale thật) hoặc
-   `http://may-tinh.tailxxxx.ts.net:5050`, bấm **Kiểm tra kết nối**.
+   `http://100.x.y.z:5000` (thay bằng IP Tailscale thật) hoặc
+   `http://may-tinh.tailxxxx.ts.net:5000`, bấm **Kiểm tra kết nối**.
 6. Xong - giờ điện thoại dùng 4G/5G hay WiFi bất kỳ vẫn kết nối được, vì
    Tailscale tự tạo đường hầm riêng giữa 2 thiết bị.
 
