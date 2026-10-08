@@ -21,15 +21,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as VideoThumbnails from "expo-video-thumbnails";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Camera, runAsync, useCameraDevice, useCameraPermission, useFrameProcessor } from "react-native-vision-camera";
+import { useCameraDevice, useCameraPermission } from "react-native-vision-camera";
+import type { Camera as VisionCameraRef } from "react-native-vision-camera";
 import type { VideoFile } from "react-native-vision-camera";
 import { RNMLKitFaceDetector } from "@infinitered/react-native-mlkit-face-detection";
-import { useFaceDetector } from "react-native-vision-camera-face-detector";
+import { Camera } from "react-native-vision-camera-face-detector";
 import type { Face, FaceDetectionOptions } from "react-native-vision-camera-face-detector";
-import { Worklets } from "react-native-worklets-core";
 import { getFaceApiUrl } from "../api/client";
 import { FaceApiError, faceCheckName, faceRegister } from "../api/faceApi";
 import FaceLoginForm from "../components/FaceLoginForm";
@@ -102,7 +102,7 @@ function biggestFace(faces: Face[] | undefined | null): Face | null {
 }
 
 type ResultMsg = { ok: boolean; text: string } | null;
-type Stage = "form" | "capturing" | "processing" | "review";
+type Stage = "form" | "starting" | "capturing" | "processing" | "review";
 
 // Phải là object ổn định (useRef bên dưới) để plugin không bị khởi tạo lại mỗi lần render.
 const DETECTOR_OPTIONS: FaceDetectionOptions = {
@@ -112,12 +112,12 @@ const DETECTOR_OPTIONS: FaceDetectionOptions = {
   minFaceSize: 0.25,
 };
 
-export default function FaceEnrollScreen() {
+function FaceEnrollScreenInner() {
   const navigation = useNavigation();
   const { token, login, logout } = useFaceAuth();
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice("front");
-  const cameraRef = useRef<Camera>(null);
+  const cameraRef = useRef<VisionCameraRef>(null);
 
   const [name, setName] = useState("");
   const [nameCheck, setNameCheck] = useState<{ checking: boolean; available: boolean | null; message: string | null }>({
@@ -154,12 +154,9 @@ export default function FaceEnrollScreen() {
   const nameCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const detectorOptions = useRef(DETECTOR_OPTIONS).current;
 
-  const faceDetector = useFaceDetector(detectorOptions);
-  const { detectFaces } = faceDetector;
-  const stopListeners = () => (faceDetector as any).stopListeners?.(); // chỉ có ở một số bản thư viện
-  // Bộ nhận diện ảnh tĩnh (kiểm tra lại khung hình trích từ video) - ML Kit qua infinitered
+  // Bộ nhận diện ảnh tĩnh (kiểm tra lại khung hình trích từ video) - tạo khi cần, trong try/catch
   const staticDetector = useRef<RNMLKitFaceDetector | null>(null);
-  if (staticDetector.current == null) staticDetector.current = new RNMLKitFaceDetector({ performanceMode: "accurate" });
+  const pendingStartRef = useRef(false);
 
   useEffect(() => {
     getFaceApiUrl().then(setFaceApiUrlState);
@@ -168,7 +165,6 @@ export default function FaceEnrollScreen() {
   useEffect(() => {
     return () => {
       runningRef.current = false;
-      stopListeners();
       if (nameCheckTimerRef.current) clearTimeout(nameCheckTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -225,7 +221,8 @@ export default function FaceEnrollScreen() {
           let fy = NaN;
           let fp = NaN;
           try {
-            const res = await staticDetector.current!.detectFaces(uri);
+            if (staticDetector.current == null) staticDetector.current = new RNMLKitFaceDetector({ performanceMode: "accurate" });
+            const res = await staticDetector.current.detectFaces(uri);
             const faces = res?.faces ?? [];
             if (faces.length > 0) {
               const big = faces.reduce((a: any, b: any) => ((a.frame?.size?.x ?? 0) * (a.frame?.size?.y ?? 0) >= (b.frame?.size?.x ?? 0) * (b.frame?.size?.y ?? 0) ? a : b));
@@ -338,23 +335,15 @@ export default function FaceEnrollScreen() {
     [finishRecording],
   );
 
-  // Frame processor là worklet (chạy ngoài JS thread) nên phải gọi lại JS qua 1 hàm ỔN ĐỊNH,
-  // còn logic thật luôn lấy bản mới nhất qua ref.
+  // Callback ỔN ĐỊNH cho component Camera của thư viện nhận diện mặt (nó tự lo frame processor);
+  // logic thật luôn lấy bản mới nhất qua ref.
+  // KHÔNG dùng runAsync của vision-camera: với worklets-core 1.3.x nó làm app sập native
+  // (SIGSEGV ở JsiWorkletContext::invokeOnWorkletThread) - chính thư viện face-detector cũng né nó.
   const onFacesRef = useRef(onFaces);
   onFacesRef.current = onFaces;
-  const onFacesJS = useMemo(() => Worklets.createRunOnJS((faces: Face[]) => onFacesRef.current(faces)), []);
-
-  const frameProcessor = useFrameProcessor(
-    (frame) => {
-      "worklet";
-      runAsync(frame, () => {
-        "worklet";
-        const faces = detectFaces(frame);
-        onFacesJS(faces);
-      });
-    },
-    [detectFaces, onFacesJS],
-  );
+  const faceCallback = useCallback((faces: Face[]) => {
+    onFacesRef.current(faces);
+  }, []);
 
   // ---------- Bắt đầu 1 lượt quay ----------
   const startRound = useCallback(() => {
@@ -409,15 +398,40 @@ export default function FaceEnrollScreen() {
     if (!name.trim() || nameCheck.available === false) return;
     collectedRef.current = [];
     setCollectedUris([]);
-    startRound();
-  }, [name, nameCheck.available, startRound]);
+    setResultMsg(null);
+    pendingStartRef.current = true;
+    setStage("starting"); // chỉ lúc này camera mới được mở; quay bắt đầu khi camera báo sẵn sàng
+  }, [name, nameCheck.available]);
 
   // Quay thêm 1 lượt (đổi kính) - GIỮ các khung đã có.
   const handleExtraRound = useCallback(() => {
     setWantsGlassesRound(false);
-    setStage("form"); // gắn lại camera, rồi bắt đầu quay
-    setTimeout(startRound, 900);
+    setResultMsg(null);
+    pendingStartRef.current = true;
+    setStage("starting");
+  }, []);
+
+  const handleCameraReady = useCallback(() => {
+    if (!pendingStartRef.current) return;
+    pendingStartRef.current = false;
+    startRound();
   }, [startRound]);
+
+  const handleCameraError = useCallback((e: any) => {
+    pendingStartRef.current = false;
+    runningRef.current = false;
+    setResultMsg({ ok: false, text: `Lỗi camera: ${e?.message ?? e}` });
+    setStage("form");
+  }, []);
+
+  // Camera mãi không sẵn sàng -> báo lỗi thay vì treo
+  useEffect(() => {
+    if (stage !== "starting") return;
+    const t = setTimeout(() => {
+      if (pendingStartRef.current) handleCameraError(new Error("Camera không khởi động được sau 8 giây"));
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [stage, handleCameraError]);
 
   const handleCancelCapture = useCallback(() => {
     runningRef.current = false;
@@ -561,16 +575,27 @@ export default function FaceEnrollScreen() {
 
   return (
     <View style={styles.cameraContainer}>
-      <Camera
-        ref={cameraRef}
-        style={styles.camera}
-        device={device}
-        isActive
-        video
-        audio={false}
-        pixelFormat="yuv"
-        frameProcessor={frameProcessor}
-      />
+      {stage !== "form" && (
+        <Camera
+          ref={cameraRef}
+          style={styles.camera}
+          device={device}
+          isActive
+          video
+          audio={false}
+            faceDetectionCallback={faceCallback}
+          faceDetectionOptions={detectorOptions}
+          onInitialized={handleCameraReady}
+          onError={handleCameraError}
+        />
+      )}
+
+      {stage === "starting" && (
+        <View style={styles.formOverlay}>
+          <ActivityIndicator color={colors.accent} />
+          <Text style={styles.bodyText}>Đang mở camera…</Text>
+        </View>
+      )}
 
       {stage === "form" && (
         <View style={styles.formOverlay}>
@@ -669,7 +694,7 @@ const styles = StyleSheet.create({
   cameraContainer: { flex: 1, backgroundColor: "#000" },
   camera: { flex: 1 },
 
-  formOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(8,10,14,0.82)", justifyContent: "center" },
+  formOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(8,10,14,0.92)", justifyContent: "center", alignItems: "stretch" },
   formCard: { paddingHorizontal: spacing.xl },
 
   topBar: {
@@ -707,3 +732,35 @@ const styles = StyleSheet.create({
   stepProgressLabel: { color: colors.textDim, fontSize: 11.5, marginTop: spacing.sm },
   liveHintText: { color: colors.warn, fontSize: 13.5, fontWeight: "700", marginTop: spacing.md, textAlign: "center" },
 });
+
+
+/** Bắt mọi lỗi JS trong màn hình này và hiện nội dung lỗi thay vì để app tự đóng. */
+class EnrollErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <SafeAreaView style={styles.center}>
+          <Ionicons name="warning-outline" size={32} color={colors.bad} />
+          <Text style={[styles.bodyText, styles.errorText]}>Màn hình huấn luyện khuôn mặt gặp lỗi:</Text>
+          <Text style={styles.apiUrlText}>{String(this.state.error.message || this.state.error)}</Text>
+          <TouchableOpacity style={styles.primaryBtn} onPress={() => this.setState({ error: null })}>
+            <Text style={styles.primaryBtnText}>Thử lại</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function FaceEnrollScreen() {
+  return (
+    <EnrollErrorBoundary>
+      <FaceEnrollScreenInner />
+    </EnrollErrorBoundary>
+  );
+}
