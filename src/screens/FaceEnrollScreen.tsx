@@ -26,8 +26,9 @@ import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Camera, runAsync, useCameraDevice, useCameraPermission, useFrameProcessor } from "react-native-vision-camera";
 import type { VideoFile } from "react-native-vision-camera";
-import { detectFaces as detectFacesInImage, useFaceDetector } from "react-native-vision-camera-face-detector";
-import type { Face, FrameFaceDetectionOptions } from "react-native-vision-camera-face-detector";
+import { RNMLKitFaceDetector } from "@infinitered/react-native-mlkit-face-detection";
+import { useFaceDetector } from "react-native-vision-camera-face-detector";
+import type { Face, FaceDetectionOptions } from "react-native-vision-camera-face-detector";
 import { Worklets } from "react-native-worklets-core";
 import { getFaceApiUrl } from "../api/client";
 import { FaceApiError, faceCheckName, faceRegister } from "../api/faceApi";
@@ -104,7 +105,7 @@ type ResultMsg = { ok: boolean; text: string } | null;
 type Stage = "form" | "capturing" | "processing" | "review";
 
 // Phải là object ổn định (useRef bên dưới) để plugin không bị khởi tạo lại mỗi lần render.
-const DETECTOR_OPTIONS: FrameFaceDetectionOptions = {
+const DETECTOR_OPTIONS: FaceDetectionOptions = {
   performanceMode: "fast",
   classificationMode: "all", // để biết mắt mở/nhắm (bước chớp mắt)
   cameraFacing: "front",
@@ -153,7 +154,12 @@ export default function FaceEnrollScreen() {
   const nameCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const detectorOptions = useRef(DETECTOR_OPTIONS).current;
 
-  const { detectFaces, stopListeners } = useFaceDetector(detectorOptions);
+  const faceDetector = useFaceDetector(detectorOptions);
+  const { detectFaces } = faceDetector;
+  const stopListeners = () => (faceDetector as any).stopListeners?.(); // chỉ có ở một số bản thư viện
+  // Bộ nhận diện ảnh tĩnh (kiểm tra lại khung hình trích từ video) - ML Kit qua infinitered
+  const staticDetector = useRef<RNMLKitFaceDetector | null>(null);
+  if (staticDetector.current == null) staticDetector.current = new RNMLKitFaceDetector({ performanceMode: "accurate" });
 
   useEffect(() => {
     getFaceApiUrl().then(setFaceApiUrlState);
@@ -216,15 +222,21 @@ export default function FaceEnrollScreen() {
               continue;
             }
           }
-          let faces: Face[] = [];
+          let fy = NaN;
+          let fp = NaN;
           try {
-            faces = await detectFacesInImage({ image: uri, options: { performanceMode: "accurate" } });
+            const res = await staticDetector.current!.detectFaces(uri);
+            const faces = res?.faces ?? [];
+            if (faces.length > 0) {
+              const big = faces.reduce((a: any, b: any) => ((a.frame?.size?.x ?? 0) * (a.frame?.size?.y ?? 0) >= (b.frame?.size?.x ?? 0) * (b.frame?.size?.y ?? 0) ? a : b));
+              fy = big.headEulerAngleY ?? 0;
+              fp = big.headEulerAngleX ?? 0;
+            }
           } catch {
-            faces = [];
+            /* bỏ qua, coi như không thấy mặt */
           }
-          const f = biggestFace(faces);
-          if (!f) continue;
-          if (Math.abs(f.yawAngle - mark.yaw) <= EXTRACT_TOLERANCE_DEG && Math.abs(f.pitchAngle - mark.pitch) <= EXTRACT_TOLERANCE_DEG) {
+          if (Number.isNaN(fy)) continue;
+          if (Math.abs(fy - mark.yaw) <= EXTRACT_TOLERANCE_DEG && Math.abs(fp - mark.pitch) <= EXTRACT_TOLERANCE_DEG) {
             rotationRef.current = r;
             chosen = uri;
             break;
