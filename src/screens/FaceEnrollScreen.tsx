@@ -21,15 +21,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as VideoThumbnails from "expo-video-thumbnails";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useCameraDevice, useCameraPermission } from "react-native-vision-camera";
-import type { Camera as VisionCameraRef } from "react-native-vision-camera";
+import { Camera, useCameraDevice, useCameraPermission, useFrameProcessor } from "react-native-vision-camera";
 import type { VideoFile } from "react-native-vision-camera";
 import { RNMLKitFaceDetector } from "@infinitered/react-native-mlkit-face-detection";
-import { Camera } from "react-native-vision-camera-face-detector";
+import { useFaceDetector } from "react-native-vision-camera-face-detector";
 import type { Face, FaceDetectionOptions } from "react-native-vision-camera-face-detector";
+import { Worklets, useSharedValue } from "react-native-worklets-core";
 import { getFaceApiUrl } from "../api/client";
 import { FaceApiError, faceCheckName, faceRegister } from "../api/faceApi";
 import FaceLoginForm from "../components/FaceLoginForm";
@@ -117,7 +117,7 @@ function FaceEnrollScreenInner() {
   const { token, login, logout } = useFaceAuth();
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice("front");
-  const cameraRef = useRef<VisionCameraRef>(null);
+  const cameraRef = useRef<Camera>(null);
 
   const [name, setName] = useState("");
   const [nameCheck, setNameCheck] = useState<{ checking: boolean; available: boolean | null; message: string | null }>({
@@ -335,15 +335,46 @@ function FaceEnrollScreenInner() {
     [finishRecording],
   );
 
-  // Callback ỔN ĐỊNH cho component Camera của thư viện nhận diện mặt (nó tự lo frame processor);
-  // logic thật luôn lấy bản mới nhất qua ref.
-  // KHÔNG dùng runAsync của vision-camera: với worklets-core 1.3.x nó làm app sập native
-  // (SIGSEGV ở JsiWorkletContext::invokeOnWorkletThread) - chính thư viện face-detector cũng né nó.
+  // ---- Frame processor: nhận diện mặt trên từng khung hình đang quay ----
+  // Cách làm COPY từ chính component Camera của thư viện face-detector (không dùng runAsync của
+  // vision-camera vì làm app sập native với worklets-core 1.3.x; không dùng component Camera của
+  // thư viện vì nó đòi cài thêm @shopify/react-native-skia).
   const onFacesRef = useRef(onFaces);
   onFacesRef.current = onFaces;
-  const faceCallback = useCallback((faces: Face[]) => {
-    onFacesRef.current(faces);
-  }, []);
+  const { detectFaces } = useFaceDetector(detectorOptions);
+  const busy = useSharedValue(false);
+  const facesJson = useSharedValue<string>("[]");
+  const logOnJs = useMemo(() => Worklets.createRunOnJS((msg: string) => console.warn(msg)), []);
+  const facesToJs = useMemo(() => Worklets.createRunOnJS((faces: Face[]) => onFacesRef.current(faces)), []);
+
+  const runOnAsyncContext = useMemo(
+    () =>
+      Worklets.defaultContext.createRunAsync((frame: any) => {
+        "worklet";
+        try {
+          facesJson.value = JSON.stringify(detectFaces(frame));
+          facesToJs(JSON.parse(facesJson.value));
+        } catch (e: any) {
+          logOnJs("Face detect error: " + (e?.message ?? "unknown"));
+        } finally {
+          frame.decrementRefCount();
+          busy.value = false;
+        }
+      }),
+    [detectFaces, facesToJs, logOnJs, facesJson, busy],
+  );
+
+  const frameProcessor = useFrameProcessor(
+    (frame) => {
+      "worklet";
+      if (busy.value) return; // đang xử lý khung trước -> bỏ khung này
+      busy.value = true;
+      const internal = frame as any;
+      internal.incrementRefCount();
+      runOnAsyncContext(internal);
+    },
+    [runOnAsyncContext, busy],
+  );
 
   // ---------- Bắt đầu 1 lượt quay ----------
   const startRound = useCallback(() => {
@@ -583,8 +614,8 @@ function FaceEnrollScreenInner() {
           isActive
           video
           audio={false}
-            faceDetectionCallback={faceCallback}
-          faceDetectionOptions={detectorOptions}
+            pixelFormat="yuv"
+          frameProcessor={frameProcessor}
           onInitialized={handleCameraReady}
           onError={handleCameraError}
         />
