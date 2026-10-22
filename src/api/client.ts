@@ -48,6 +48,25 @@ export async function setFaceApiUrl(url: string): Promise<void> {
   await AsyncStorage.setItem(FACE_API_URL_KEY, trimmed);
 }
 
+// ---------------------------------------------------------------------
+// Địa chỉ camera (xem trực tiếp ở tab Trực tiếp). Lưu vào máy, đổi được trong Cài đặt.
+const CAMERA_URL_KEY = "gesture-home:camera-url";
+export const DEFAULT_CAMERA_URL = "http://192.168.1.15:8090/";
+let cachedCameraUrl: string | null = null;
+
+export async function getCameraUrl(): Promise<string> {
+  if (cachedCameraUrl) return cachedCameraUrl;
+  const stored = await AsyncStorage.getItem(CAMERA_URL_KEY);
+  cachedCameraUrl = stored || DEFAULT_CAMERA_URL;
+  return cachedCameraUrl;
+}
+
+export async function setCameraUrl(url: string): Promise<void> {
+  const trimmed = url.trim();
+  cachedCameraUrl = trimmed;
+  await AsyncStorage.setItem(CAMERA_URL_KEY, trimmed);
+}
+
 // API_KEY tuỳ chọn của main.py (biến môi trường API_KEY trên Pi) - nếu
 // Pi có đặt, mọi request /register /verify /users /history phải kèm
 // header X-API-Key đúng giá trị đó. Để trống nếu Pi không đặt API_KEY.

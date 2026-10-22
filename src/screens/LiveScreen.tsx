@@ -6,6 +6,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-nati
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getState } from "../api/client";
 import type { HistoryEntry } from "../api/types";
+import CameraFeed from "../components/CameraFeed";
 import { useAuth } from "../context/AuthContext";
 import { usePolling } from "../hooks/usePolling";
 import type { RootStackParamList } from "../navigation/types";
@@ -75,9 +76,11 @@ export default function LiveScreen() {
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>Trực tiếp</Text>
-        <Text style={styles.subtitle}>Nhật ký hành động và huấn luyện tại chỗ</Text>
+        <Text style={styles.subtitle}>Camera, nhật ký hành động và huấn luyện tại chỗ</Text>
       </View>
       <ScrollView contentContainerStyle={styles.scroll}>
+        <CameraFeed />
+
         <FaceEnrollPanel />
 
         <View style={styles.sectionHead}>

@@ -6,9 +6,11 @@ import { clearToken, getToken } from "../api/authToken";
 import {
   ApiError,
   apiMe,
+  getCameraUrl,
   getFaceApiKey,
   getFaceApiUrl,
   getServerUrl,
+  setCameraUrl,
   setFaceApiKey,
   setFaceApiUrl,
   setServerUrl,
@@ -27,11 +29,14 @@ export default function SettingsScreen() {
   const [faceSaving, setFaceSaving] = useState(false);
   const [faceTesting, setFaceTesting] = useState(false);
   const [faceMessage, setFaceMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [cameraUrl, setCameraUrlState] = useState("");
+  const [cameraMsg, setCameraMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [hasToken, setHasToken] = useState(false);
 
   useEffect(() => {
     getServerUrl().then(setUrl);
     getFaceApiUrl().then(setFaceUrl);
+    getCameraUrl().then(setCameraUrlState);
     getFaceApiKey().then(setFaceApiKeyState);
     getToken().then((t) => setHasToken(!!t));
   }, []);
@@ -84,6 +89,15 @@ export default function SettingsScreen() {
     setFaceMessage({ text: "Đã lưu cấu hình Face API.", ok: true });
   }
 
+  async function onCameraSave() {
+    if (!/^https?:\/\/.+/.test(cameraUrl.trim())) {
+      setCameraMsg({ text: "Địa chỉ phải bắt đầu bằng http:// hoặc https://", ok: false });
+      return;
+    }
+    await setCameraUrl(cameraUrl);
+    setCameraMsg({ text: "Đã lưu. Vào tab Trực tiếp để xem camera.", ok: true });
+  }
+
   async function onFaceTest() {
     setFaceTesting(true);
     setFaceMessage(null);
@@ -134,6 +148,32 @@ export default function SettingsScreen() {
           <Text style={styles.mono}>http://100.101.102.103:5000</Text> hoặc{" "}
           <Text style={styles.mono}>http://may-tinh.tailxxxx.ts.net:5000</Text>.
         </Text>
+
+        <View style={styles.divider} />
+
+        <Text style={styles.sectionTitle}>Địa chỉ camera (xem ở tab Trực tiếp)</Text>
+        <Text style={styles.desc}>Địa chỉ trang/luồng hình ảnh của camera, ví dụ http://192.168.1.15:8090/</Text>
+        <TextInput
+          value={cameraUrl}
+          onChangeText={setCameraUrlState}
+          autoCapitalize="none"
+          autoCorrect={false}
+          keyboardType="url"
+          placeholder="http://192.168.1.15:8090/"
+          placeholderTextColor={colors.textFaint}
+          style={styles.input}
+        />
+        {cameraMsg ? (
+          <View style={[styles.msgBox, { backgroundColor: cameraMsg.ok ? colors.goodSoft : colors.badSoft }]}>
+            <Ionicons name={cameraMsg.ok ? "checkmark-circle" : "alert-circle"} size={15} color={cameraMsg.ok ? colors.good : colors.bad} />
+            <Text style={[styles.msgText, { color: cameraMsg.ok ? colors.good : colors.bad }]}>{cameraMsg.text}</Text>
+          </View>
+        ) : null}
+        <View style={styles.buttonRow}>
+          <TouchableOpacity style={styles.primaryButton} onPress={onCameraSave} activeOpacity={0.85}>
+            <Text style={styles.primaryButtonText}>Lưu</Text>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.divider} />
 
