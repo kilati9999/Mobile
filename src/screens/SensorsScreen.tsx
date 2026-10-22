@@ -10,6 +10,11 @@ import { colors, radius, spacing, typography } from "../theme";
 
 const CHART_WIDTH = Dimensions.get("window").width - spacing.lg * 2 - spacing.lg * 2;
 
+/** Chưa có số liệu thật -> hiện "—" (không bịa số). */
+function fmtVal(v: number | null, unit: string) {
+  return v === null || v === undefined ? "—" : `${v}${unit}`;
+}
+
 function SiteSensorCard({ site }: { site: SensorSite }) {
   return (
     <View style={styles.card}>
@@ -31,19 +36,19 @@ function SiteSensorCard({ site }: { site: SensorSite }) {
       <View style={styles.metricRow}>
         <View style={styles.metric}>
           <Text style={styles.metricLabel}>Nhiệt độ</Text>
-          <Text style={[styles.metricVal, site.fire_alert && { color: colors.bad }]}>{site.temperature}°C</Text>
+          <Text style={[styles.metricVal, site.fire_alert && { color: colors.bad }]}>{fmtVal(site.temperature, "°C")}</Text>
         </View>
         <View style={styles.metric}>
           <Text style={styles.metricLabel}>Độ ẩm</Text>
-          <Text style={styles.metricVal}>{site.humidity}%</Text>
+          <Text style={styles.metricVal}>{fmtVal(site.humidity, "%")}</Text>
         </View>
         <View style={styles.metric}>
           <Text style={styles.metricLabel}>Khí gas</Text>
-          <Text style={[styles.metricVal, site.fire_alert && { color: colors.bad }]}>{site.gas} ppm</Text>
+          <Text style={[styles.metricVal, site.fire_alert && { color: colors.bad }]}>{fmtVal(site.gas, " ppm")}</Text>
         </View>
       </View>
 
-      <MiniChart values={site.history.map((h) => h.temperature)} color={colors.bad} width={CHART_WIDTH} />
+      <MiniChart values={site.history.map((h) => h.temperature).filter((v): v is number => v !== null)} color={colors.bad} width={CHART_WIDTH} />
     </View>
   );
 }

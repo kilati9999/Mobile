@@ -89,13 +89,14 @@ export interface SensorSite {
   site_id: string;
   site_name: string;
   site_address: string;
-  temperature: number;
-  humidity: number;
-  gas: number;
+  temperature: number | null;
+  humidity: number | null;
+  gas: number | null;
   fire_alert: boolean;
-  source?: "real" | "sim" | string;
+  /** "real" = có dữ liệu thật từ board cảm biến; "none" = chưa có / mất tín hiệu. */
+  source?: "real" | "none" | string;
   updated_at: string | null;
-  history: { time: string; temperature: number; humidity: number; gas: number }[];
+  history: { time: string; temperature: number | null; humidity: number | null; gas: number | null }[];
 }
 
 export interface SensorAlert {
