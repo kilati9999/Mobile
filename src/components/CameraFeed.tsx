@@ -1,9 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useIsFocused } from "@react-navigation/native";
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { WebView } from "react-native-webview";
-import { getCameraUrl } from "../api/client";
+import { DEFAULT_CAMERA_URL, getCameraUrl, setCameraUrl } from "../api/client";
 import { colors, radius, spacing } from "../theme";
 
 // Ép trang của camera vừa khít chiều ngang khung xem (ảnh/video co theo chiều rộng).
@@ -26,6 +26,29 @@ export default function CameraFeed() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [formErr, setFormErr] = useState<string | null>(null);
+
+  const startEdit = () => {
+    setDraft(url || DEFAULT_CAMERA_URL);
+    setFormErr(null);
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    const v = draft.trim();
+    if (!/^https?:\/\/.+/.test(v)) {
+      setFormErr("Địa chỉ phải bắt đầu bằng http:// hoặc https://");
+      return;
+    }
+    await setCameraUrl(v);
+    setUrl(v);
+    setEditing(false);
+    setError(null);
+    setLoading(true);
+    setReloadKey((k) => k + 1);
+  };
 
   useEffect(() => {
     // đọc lại mỗi lần quay về tab (đề phòng vừa đổi địa chỉ trong Cài đặt)
@@ -45,10 +68,43 @@ export default function CameraFeed() {
           <Ionicons name="videocam" size={15} color={colors.accent} />
           <Text style={styles.title}>Camera</Text>
         </View>
-        <TouchableOpacity onPress={reload} hitSlop={10} accessibilityLabel="Tải lại camera">
-          <Ionicons name="refresh" size={18} color={colors.textDim} />
-        </TouchableOpacity>
+        <View style={styles.actions}>
+          <TouchableOpacity onPress={startEdit} hitSlop={10} accessibilityLabel="Đổi địa chỉ camera">
+            <Ionicons name="create-outline" size={18} color={colors.textDim} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={reload} hitSlop={10} accessibilityLabel="Tải lại camera">
+            <Ionicons name="refresh" size={18} color={colors.textDim} />
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {editing ? (
+        <View style={styles.editBox}>
+          <Text style={styles.editLabel}>Địa chỉ camera</Text>
+          <TextInput
+            value={draft}
+            onChangeText={setDraft}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            placeholder={DEFAULT_CAMERA_URL}
+            placeholderTextColor={colors.textFaint}
+            style={styles.input}
+          />
+          {formErr ? <Text style={styles.formErr}>{formErr}</Text> : null}
+          <View style={styles.editRow}>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => setEditing(false)}>
+              <Text style={styles.retryText}>Hủy</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => setDraft(DEFAULT_CAMERA_URL)}>
+              <Text style={styles.retryText}>Mặc định</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.retryBtn, styles.saveBtn]} onPress={saveEdit}>
+              <Text style={styles.retryText}>Lưu</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
 
       <View style={styles.frame}>
         {focused && url ? (
@@ -98,6 +154,13 @@ const styles = StyleSheet.create({
   head: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.sm },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   title: { color: colors.text, fontSize: 13.5, fontWeight: "700" },
+  actions: { flexDirection: "row", alignItems: "center", gap: 16 },
+  editBox: { marginBottom: spacing.sm, gap: 6 },
+  editLabel: { color: colors.textDim, fontSize: 11.5 },
+  input: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 10, paddingVertical: 8, color: colors.text, fontSize: 13 },
+  formErr: { color: colors.bad, fontSize: 11.5 },
+  editRow: { flexDirection: "row", justifyContent: "flex-end", gap: 8 },
+  saveBtn: { borderColor: colors.accent },
   frame: { width: "100%", aspectRatio: 16 / 9, backgroundColor: "#000", borderRadius: radius.sm, overflow: "hidden" },
   web: { flex: 1, backgroundColor: "#000" },
   overlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", padding: spacing.md, gap: 6, backgroundColor: "rgba(0,0,0,0.55)" },

@@ -152,14 +152,14 @@ export default function SettingsScreen() {
         <View style={styles.divider} />
 
         <Text style={styles.sectionTitle}>Địa chỉ camera (xem ở tab Trực tiếp)</Text>
-        <Text style={styles.desc}>Địa chỉ trang/luồng hình ảnh của camera, ví dụ http://192.168.1.15:8090/</Text>
+        <Text style={styles.desc}>Địa chỉ trang/luồng hình ảnh của camera, ví dụ http://100.90.119.70:8090/</Text>
         <TextInput
           value={cameraUrl}
           onChangeText={setCameraUrlState}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
-          placeholder="http://192.168.1.15:8090/"
+          placeholder="http://100.90.119.70:8090/"
           placeholderTextColor={colors.textFaint}
           style={styles.input}
         />

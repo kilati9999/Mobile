@@ -51,7 +51,7 @@ export async function setFaceApiUrl(url: string): Promise<void> {
 // ---------------------------------------------------------------------
 // Địa chỉ camera (xem trực tiếp ở tab Trực tiếp). Lưu vào máy, đổi được trong Cài đặt.
 const CAMERA_URL_KEY = "gesture-home:camera-url";
-export const DEFAULT_CAMERA_URL = "http://192.168.1.15:8090/";
+export const DEFAULT_CAMERA_URL = "http://100.90.119.70:8090/";
 let cachedCameraUrl: string | null = null;
 
 export async function getCameraUrl(): Promise<string> {
