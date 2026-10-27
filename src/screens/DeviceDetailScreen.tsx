@@ -1,11 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
-import Slider from "@react-native-community/slider";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp, NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ApiError, deleteDeviceApi, disconnectDevice, getDevices, setDeviceLevel, toggleDevice } from "../api/client";
+import { ApiError, deleteDeviceApi, disconnectDevice, getDevices, toggleDevice } from "../api/client";
 import type { Device } from "../api/types";
 import StatusPill from "../components/StatusPill";
 import { useAuth } from "../context/AuthContext";
@@ -32,7 +31,6 @@ export default function DeviceDetailScreen({ route }: Props) {
   const { user } = useAuth();
   const canControl = user?.role === "admin";
   const [device, setDevice] = useState<Device | null>(null);
-  const [sliderValue, setSliderValue] = useState(0);
   const [saving, setSaving] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
 
@@ -40,7 +38,6 @@ export default function DeviceDetailScreen({ route }: Props) {
     const devices = await getDevices();
     const found = devices.find((d) => d.id === deviceId) || null;
     setDevice(found);
-    if (found?.level !== null && found?.level !== undefined) setSliderValue(found.level);
   }
 
   useEffect(() => {
@@ -61,25 +58,11 @@ export default function DeviceDetailScreen({ route }: Props) {
   const meta = deviceMeta(device.type);
   const statusMeta = STATUS_META[device.status];
   const espMeta = ESP_STATUS_META[device.esp_status];
-  const hasLevel = device.type === "dimmer" || device.type === "speed";
-  const maxLevel = device.type === "dimmer" ? 100 : 5;
 
   async function handleToggle() {
     setSaving(true);
     try {
       await toggleDevice(device!.id);
-    } catch (e) {
-      if (e instanceof ApiError) console.warn(e.payload?.reason || e.message);
-    } finally {
-      setSaving(false);
-      load();
-    }
-  }
-
-  async function handleSlideComplete(value: number) {
-    setSaving(true);
-    try {
-      await setDeviceLevel(device!.id, Math.round(value));
     } catch (e) {
       if (e instanceof ApiError) console.warn(e.payload?.reason || e.message);
     } finally {
@@ -179,30 +162,6 @@ export default function DeviceDetailScreen({ route }: Props) {
               />
             )}
           </View>
-
-          {hasLevel && (
-            <View style={styles.sliderBlock}>
-              <View style={styles.sliderHead}>
-                <Text style={styles.cardTitle}>{device.type === "dimmer" ? "Độ sáng" : "Tốc độ"}</Text>
-                <Text style={styles.sliderVal}>
-                  {Math.round(sliderValue)}
-                  {device.type === "dimmer" ? "%" : ""}
-                </Text>
-              </View>
-              <Slider
-                minimumValue={0}
-                maximumValue={maxLevel}
-                step={1}
-                value={sliderValue}
-                disabled={!canControl || device.status !== "ok"}
-                onValueChange={setSliderValue}
-                onSlidingComplete={handleSlideComplete}
-                minimumTrackTintColor={colors.accent}
-                maximumTrackTintColor={colors.cardAlt}
-                thumbTintColor={colors.accent}
-              />
-            </View>
-          )}
         </View>
 
         <Text style={styles.sectionTitle}>Kết nối &amp; cấu hình</Text>
@@ -267,9 +226,6 @@ const styles = StyleSheet.create({
   toggleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   cardTitle: { color: colors.text, fontSize: 14, fontWeight: "700" },
   cardSub: { color: colors.textFaint, fontSize: 11.5, marginTop: 2 },
-  sliderBlock: { marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border },
-  sliderHead: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4 },
-  sliderVal: { color: colors.accent, fontSize: 13, fontWeight: "700", fontFamily: "monospace" },
   sectionTitle: { color: colors.textFaint, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 1, marginBottom: spacing.sm },
   infoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.border },
   infoLabel: { color: colors.textFaint, fontSize: 12.5 },

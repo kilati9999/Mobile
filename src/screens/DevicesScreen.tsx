@@ -7,7 +7,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ApiError, getDevices, getSites, toggleDevice } from "../api/client";
 import type { Device } from "../api/types";
 import DeviceCard from "../components/DeviceCard";
-import SensorSection from "../components/SensorSection";
 import { usePolling } from "../hooks/usePolling";
 import type { RootStackParamList } from "../navigation/types";
 import { colors, radius, spacing, typography } from "../theme";
@@ -61,7 +60,7 @@ export default function DevicesScreen() {
             <View style={styles.headerRow}>
               <View style={styles.headerTextCol}>
                 <Text style={styles.title}>Thiết bị &amp; ESP32</Text>
-                <Text style={styles.subtitle}>Toàn bộ thiết bị, cảm biến và board ESP32 điều khiển</Text>
+                <Text style={styles.subtitle}>Toàn bộ thiết bị và board ESP32 điều khiển</Text>
               </View>
               <View style={styles.headerButtons}>
                 <TouchableOpacity style={styles.addButtonOutline} onPress={() => navigation.navigate("DeviceForm")} activeOpacity={0.85}>
@@ -73,8 +72,6 @@ export default function DevicesScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-
-            <SensorSection />
 
             <Text style={styles.listSectionTitle}>Danh sách thiết bị</Text>
             <FlatList

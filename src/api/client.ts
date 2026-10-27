@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
-import type { Account, Device, PendingBoard, SensorsResponse, Site, StateResponse, User } from "./types";
+import type { Account, Device, PendingBoard, Site, StateResponse, User } from "./types";
 
 const SERVER_URL_KEY = "gesture-home:server-url";
 
@@ -191,10 +191,6 @@ export function getSites(): Promise<Site[]> {
   return request<Site[]>("/api/sites");
 }
 
-export function getSensors(): Promise<SensorsResponse> {
-  return request<SensorsResponse>("/api/sensors");
-}
-
 export function getHistory(): Promise<any[]> {
   return request<any[]>("/api/history");
 }
@@ -203,13 +199,6 @@ export function getHistory(): Promise<any[]> {
 
 export async function toggleDevice(deviceId: string): Promise<Device> {
   return request<Device>(`/api/devices/${encodeURIComponent(deviceId)}/toggle`, { method: "POST" });
-}
-
-export async function setDeviceLevel(deviceId: string, level: number): Promise<Device> {
-  return request<Device>(`/api/devices/${encodeURIComponent(deviceId)}/level`, {
-    method: "POST",
-    body: JSON.stringify({ level }),
-  });
 }
 
 // ---------------------------------------------------------------------

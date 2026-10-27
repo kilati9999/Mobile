@@ -7,7 +7,6 @@ import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ApiError, getState, toggleDevice } from "../api/client";
 import type { Device } from "../api/types";
-import FireBanner from "../components/FireBanner";
 import KpiCard from "../components/KpiCard";
 import RoomSection from "../components/RoomSection";
 import { useAuth } from "../context/AuthContext";
@@ -78,8 +77,6 @@ export default function HomeScreen() {
             <KpiCard icon="warning" label="Sự cố" value={data?.stats.devices_issue ?? "–"} tint={colors.warn} />
           </View>
         </LinearGradient>
-
-        <FireBanner />
 
         <View style={styles.body}>
           {data?.sites.map((site) => (
