@@ -6,7 +6,7 @@
  * Khớp đúng theo main.py thật đã đọc:
  *
  *   POST /login              form: username, password  -> token
- *   POST /register           form: name + files: images[] (>= 5)  [cần Bearer + X-API-Key nếu có]
+ *   POST /register           form: name, overwrite ("true" để ghi đè tên đã có) + files: images[] (>= 5)  [cần Bearer + X-API-Key nếu có]
  *   POST /verify             files: images[] (>= 3, để kiểm tra chống giả mạo) [cần Bearer + X-API-Key nếu có]
  *   GET  /users/check-name   query: name                [cần Bearer]
  *   GET  /users                                          [cần Bearer + X-API-Key nếu có]
@@ -40,6 +40,7 @@ export interface FaceRegisterResult {
   user_id: number | null;
   name: string | null;
   num_embeddings: number;
+  overwritten?: boolean;
   message: string;
 }
 
@@ -52,6 +53,8 @@ export interface FaceVerifyResult {
 
 export interface FaceCheckNameResult {
   available: boolean;
+  exists?: boolean; // tên đã đăng ký trước đó
+  can_overwrite?: boolean; // được phép ghi đè (overwrite=true khi /register)
   message: string;
 }
 
@@ -131,10 +134,11 @@ export async function facePoseCheck(imageUri: string): Promise<PoseCheckResult> 
   return data as PoseCheckResult;
 }
 
-export async function faceRegister(name: string, imageUris: string[]): Promise<FaceRegisterResult> {
+export async function faceRegister(name: string, imageUris: string[], overwrite = false): Promise<FaceRegisterResult> {
   const base = await getFaceApiUrl();
   const form = new FormData();
   form.append("name", name);
+  form.append("overwrite", overwrite ? "true" : "false");
   imageUris.forEach((uri, idx) => {
     // @ts-expect-error - React Native FormData chấp nhận object {uri,name,type}, khác với DOM FormData chuẩn
     form.append("images", { uri, name: `face_${idx}.jpg`, type: "image/jpeg" });

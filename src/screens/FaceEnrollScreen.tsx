@@ -22,7 +22,7 @@ import { useNavigation } from "@react-navigation/native";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Camera, useCameraDevice, useCameraPermission, useFrameProcessor } from "react-native-vision-camera";
 import type { VideoFile } from "react-native-vision-camera";
@@ -120,11 +120,23 @@ function FaceEnrollScreenInner() {
   const cameraRef = useRef<Camera>(null);
 
   const [name, setName] = useState("");
-  const [nameCheck, setNameCheck] = useState<{ checking: boolean; available: boolean | null; message: string | null }>({
+  const [nameCheck, setNameCheck] = useState<{
+    checking: boolean;
+    available: boolean | null;
+    exists: boolean;
+    canOverwrite: boolean;
+    message: string | null;
+  }>({
     checking: false,
     available: null,
+    exists: false,
+    canOverwrite: false,
     message: null,
   });
+  // Người dùng đã đồng ý ghi đè đăng ký cũ (hỏi TRƯỚC khi quay) -> gửi overwrite=true lúc /register.
+  const overwriteRef = useRef(false);
+  const checkingBeginRef = useRef(false);
+  const nameBlocked = nameCheck.available === false && !nameCheck.canOverwrite;
   const [faceApiUrl, setFaceApiUrlState] = useState("");
   const [stage, setStage] = useState<Stage>("form");
   const [stepIdx, setStepIdx] = useState(0);
@@ -174,16 +186,23 @@ function FaceEnrollScreenInner() {
   useEffect(() => {
     if (nameCheckTimerRef.current) clearTimeout(nameCheckTimerRef.current);
     if (!name.trim() || token == null) {
-      setNameCheck({ checking: false, available: null, message: null });
+      setNameCheck({ checking: false, available: null, exists: false, canOverwrite: false, message: null });
       return;
     }
     nameCheckTimerRef.current = setTimeout(async () => {
       setNameCheck((s) => ({ ...s, checking: true }));
       try {
         const result = await faceCheckName(name.trim());
-        setNameCheck({ checking: false, available: result.available, message: result.message });
+        const exists = result.exists ?? !result.available;
+        setNameCheck({
+          checking: false,
+          available: result.available,
+          exists,
+          canOverwrite: exists && result.can_overwrite !== false,
+          message: result.message,
+        });
       } catch {
-        setNameCheck({ checking: false, available: null, message: null });
+        setNameCheck({ checking: false, available: null, exists: false, canOverwrite: false, message: null });
       }
     }, NAME_CHECK_DEBOUNCE_MS);
   }, [name, token]);
@@ -254,8 +273,11 @@ function FaceEnrollScreenInner() {
     setStage("processing");
     setProcessingText("Đang lưu video…");
     try {
-      await cameraRef.current?.stopRecording();
-      const video = await recordedRef.current;
+      // Chống kẹt ở "Đang lưu video…": nếu camera không trả file trong 20 giây thì báo lỗi thay vì treo mãi.
+      const withTimeout = <T,>(p: Promise<T>, ms: number) =>
+        Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error("Hết thời gian chờ lưu video, hãy thử quay lại")), ms))]);
+      await withTimeout(Promise.resolve(cameraRef.current?.stopRecording()), 20000);
+      const video = await withTimeout(Promise.resolve(recordedRef.current), 20000);
       if (!video) throw new Error("Không nhận được file video");
       const marks = [...marksRef.current];
       const uris = await extractFrames(video, marks);
@@ -425,14 +447,60 @@ function FaceEnrollScreenInner() {
     setStage("capturing");
   }, []);
 
-  const handleBegin = useCallback(() => {
-    if (!name.trim() || nameCheck.available === false) return;
+  const startRecording = useCallback(() => {
     collectedRef.current = [];
     setCollectedUris([]);
     setResultMsg(null);
     pendingStartRef.current = true;
     setStage("starting"); // chỉ lúc này camera mới được mở; quay bắt đầu khi camera báo sẵn sàng
-  }, [name, nameCheck.available]);
+  }, []);
+
+  // Hỏi về tên trùng TRƯỚC khi quay để người dùng không phải quay xong mới biết.
+  const handleBegin = useCallback(async () => {
+    const trimmed = name.trim();
+    if (!trimmed || checkingBeginRef.current) return;
+    checkingBeginRef.current = true;
+    overwriteRef.current = false;
+    try {
+      let exists = false;
+      let canOverwrite = false;
+      let message = `Tên '${trimmed}' đã được đăng ký trước đó - bạn có muốn ghi đè lần đăng ký cũ không?`;
+      try {
+        const chk = await faceCheckName(trimmed); // luôn hỏi lại server, không tin kết quả gõ dở
+        exists = chk.exists ?? !chk.available;
+        canOverwrite = exists && chk.can_overwrite !== false;
+        if (chk.message) message = chk.message;
+      } catch (e) {
+        if (e instanceof FaceApiError && e.status === 401) {
+          await logout();
+          return;
+        }
+        // Không kiểm tra được -> vẫn cho quay; /register sẽ báo 409 nếu trùng.
+      }
+
+      if (!exists) {
+        startRecording();
+        return;
+      }
+      if (!canOverwrite) {
+        setResultMsg({ ok: false, text: message });
+        return;
+      }
+      Alert.alert("Tên đã tồn tại", message, [
+        { text: "Không", style: "cancel" }, // quay lại ô nhập tên
+        {
+          text: "Ghi đè",
+          style: "destructive",
+          onPress: () => {
+            overwriteRef.current = true;
+            startRecording();
+          },
+        },
+      ]);
+    } finally {
+      checkingBeginRef.current = false;
+    }
+  }, [name, logout, startRecording]);
 
   // Quay thêm 1 lượt (đổi kính) - GIỮ các khung đã có.
   const handleExtraRound = useCallback(() => {
@@ -485,8 +553,11 @@ function FaceEnrollScreenInner() {
     setSubmitting(true);
     setResultMsg(null);
     try {
-      const data = await faceRegister(name.trim(), collectedUris);
-      setResultMsg({ ok: true, text: `Đã đăng ký "${data.name}" với ${data.num_embeddings} vector khuôn mặt.` });
+      const data = await faceRegister(name.trim(), collectedUris, overwriteRef.current);
+      setResultMsg({
+        ok: true,
+        text: `${data.overwritten ? "Đã ghi đè đăng ký cũ của" : "Đã đăng ký"} "${data.name}" với ${data.num_embeddings} vector khuôn mặt.`,
+      });
     } catch (e) {
       if (e instanceof FaceApiError && e.status === 401) {
         await logout();
@@ -646,14 +717,16 @@ function FaceEnrollScreenInner() {
             {!name.trim() ? <Text style={styles.hintText}>Nhập tên trước khi bắt đầu.</Text> : null}
             {nameCheck.checking ? <Text style={styles.hintText}>Đang kiểm tra tên…</Text> : null}
             {!nameCheck.checking && nameCheck.message ? (
-              <Text style={[styles.hintText, nameCheck.available === false && styles.errorText]}>{nameCheck.message}</Text>
+              <Text style={[styles.hintText, nameCheck.available === false && !nameCheck.canOverwrite && styles.errorText]}>
+                {nameCheck.message}
+              </Text>
             ) : null}
             {resultMsg ? <Text style={[styles.hintText, resultMsg.ok ? styles.successText : styles.errorText]}>{resultMsg.text}</Text> : null}
             <Text style={styles.apiUrlText}>Face API: {faceApiUrl || "…"} (sửa ở tab Khác → Cài đặt)</Text>
             <TouchableOpacity
-              style={[styles.primaryBtn, (!name.trim() || nameCheck.available === false) && styles.primaryBtnDisabled]}
+              style={[styles.primaryBtn, (!name.trim() || nameBlocked) && styles.primaryBtnDisabled]}
               onPress={handleBegin}
-              disabled={!name.trim() || nameCheck.available === false}
+              disabled={!name.trim() || nameBlocked}
             >
               <Text style={styles.primaryBtnText}>Bắt đầu quay</Text>
             </TouchableOpacity>
