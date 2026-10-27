@@ -270,15 +270,29 @@ function FaceEnrollScreenInner() {
   // ---------- Dừng quay -> trích khung hình -> chuyển sang màn xác nhận ----------
   const finishRecording = useCallback(async () => {
     runningRef.current = false;
-    setStage("processing");
     setProcessingText("Đang lưu video…");
+    // QUAN TRỌNG: giữ nguyên màn quay (Camera còn được gắn) cho tới khi file video về tay.
+    // Chuyển sang màn "processing" trước sẽ gỡ <Camera> và huỷ luôn bản ghi -> onRecordingFinished không bao giờ gọi.
+    setLiveHint("Đang lưu video…");
     try {
-      // Chống kẹt ở "Đang lưu video…": nếu camera không trả file trong 20 giây thì báo lỗi thay vì treo mãi.
-      const withTimeout = <T,>(p: Promise<T>, ms: number) =>
-        Promise.race([p, new Promise<never>((_, rej) => setTimeout(() => rej(new Error("Hết thời gian chờ lưu video, hãy thử quay lại")), ms))]);
-      await withTimeout(Promise.resolve(cameraRef.current?.stopRecording()), 20000);
-      const video = await withTimeout(Promise.resolve(recordedRef.current), 20000);
+      // KHÔNG chờ stopRecording() (trên một số máy promise này không bao giờ trả về dù file vẫn được lưu);
+      // chỉ cần onRecordingFinished trả file. Quá 25 giây mới báo lỗi, kèm nguyên nhân gần nhất.
+      let stopErr = "";
+      try {
+        Promise.resolve(cameraRef.current?.stopRecording()).catch((e: any) => {
+          stopErr = e?.message ?? String(e);
+        });
+      } catch (e: any) {
+        stopErr = e?.message ?? String(e);
+      }
+      const video = await Promise.race([
+        recordedRef.current as Promise<VideoFile>,
+        new Promise<never>((_, rej) =>
+          setTimeout(() => rej(new Error(`Camera không trả file video sau 25 giây${stopErr ? ` (${stopErr})` : ""}`)), 25000),
+        ),
+      ]);
       if (!video) throw new Error("Không nhận được file video");
+      setStage("processing"); // giờ mới gỡ camera được, video đã lưu xong
       const marks = [...marksRef.current];
       const uris = await extractFrames(video, marks);
       collectedRef.current = [...collectedRef.current, ...uris];
@@ -420,8 +434,6 @@ function FaceEnrollScreenInner() {
     recordedRef.current = new Promise<VideoFile>((resolve, reject) => {
       try {
         cam.startRecording({
-          fileType: "mp4",
-          videoCodec: "h264",
           onRecordingFinished: resolve,
           onRecordingError: (err) => reject(new Error(err?.message ?? "Lỗi quay video")),
         });
