@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
-import type { Account, Device, PendingBoard, Site, StateResponse, User } from "./types";
+import type { Account, Device, DoorCmd, PendingBoard, SensorsResponse, Site, StateResponse, User } from "./types";
 
 const SERVER_URL_KEY = "gesture-home:server-url";
 
@@ -191,6 +191,11 @@ export function getSites(): Promise<Site[]> {
   return request<Site[]>("/api/sites");
 }
 
+// Khôi phục (bị xoá nhầm ở 1.1.2) - FireBanner / SensorSection / SensorsScreen cần hàm này
+export function getSensors(): Promise<SensorsResponse> {
+  return request<SensorsResponse>("/api/sensors");
+}
+
 export function getHistory(): Promise<any[]> {
   return request<any[]>("/api/history");
 }
@@ -199,6 +204,15 @@ export function getHistory(): Promise<any[]> {
 
 export async function toggleDevice(deviceId: string): Promise<Device> {
   return request<Device>(`/api/devices/${encodeURIComponent(deviceId)}/toggle`, { method: "POST" });
+}
+
+// Cửa cuốn: open = chạy lên, close = chạy xuống, stop = dừng (POST /api/devices/<id>/door)
+export async function doorCommand(deviceId: string, cmd: DoorCmd): Promise<Device> {
+  // Lỗi (409) trả {error, reason} -> request() ném ApiError, lý do nằm ở e.payload.reason
+  return request<Device>(`/api/devices/${encodeURIComponent(deviceId)}/door`, {
+    method: "POST",
+    body: JSON.stringify({ cmd }),
+  });
 }
 
 // ---------------------------------------------------------------------

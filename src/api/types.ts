@@ -34,7 +34,13 @@ export interface Device {
   status_label: string;
   conn_type: "http" | "mqtt";
   mqtt_slot: string | null;
+  // Cửa cuốn (board ESP32 slot "door") - server gửi kèm trạng thái thật từ firmware
+  door_state?: "CLOSED" | "OPENING" | "OPEN" | "CLOSING" | "STOPPED" | "ERROR" | null;
+  door_error?: string | null;
+  door_manual?: boolean; // firmware MANUAL_MODE: Lên / Xuống / Dừng thủ công
 }
+
+export type DoorCmd = "open" | "close" | "stop";
 
 export interface Site {
   id: string;
