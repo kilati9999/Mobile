@@ -2,7 +2,7 @@
   "expo": {
     "name": "SmartHome",
     "slug": "gesture-home",
-    "version": "1.0.2",
+    "version": "1.1.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
