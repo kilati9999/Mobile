@@ -32,8 +32,28 @@ export interface Device {
   esp_status: "connected" | "disconnected" | "unconfigured";
   status: "ok" | "power_off" | "offline" | "error";
   status_label: string;
-  conn_type: "http" | "mqtt";
+  conn_type: "http" | "mqtt" | "touch4";
   mqtt_slot: string | null;
+  // Công tắc Touch4 (công ty): "light" | "fan" | "door"
+  touch4_slot?: string | null;
+  // Cửa cuốn (board ESP32 slot "door") - server gửi kèm trạng thái thật từ firmware
+  door_state?: "CLOSED" | "OPENING" | "OPEN" | "CLOSING" | "STOPPED" | "ERROR" | null;
+  door_error?: string | null;
+  door_manual?: boolean; // firmware MANUAL_MODE: Lên / Xuống / Dừng thủ công
+}
+
+export type DoorCmd = "open" | "close" | "stop";
+
+// Cảnh báo té ngã từ camera công ty (server gc /api/falls)
+export interface FallAlert {
+  id: number;
+  time: string; // "HH:MM:SS dd/mm/yyyy"
+  ts: number; // epoch giây (giờ server)
+  camera: string;
+  message: string;
+  has_image: boolean;
+  acknowledged: boolean;
+  ack_by: string | null;
 }
 
 export interface Site {

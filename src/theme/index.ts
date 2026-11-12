@@ -78,3 +78,14 @@ export const ESP_STATUS_META: Record<string, { label: string; color: string }> =
   disconnected: { label: "Mất kết nối ESP32", color: colors.bad },
   unconfigured: { label: "Chưa gán ESP32", color: colors.textFaint },
 };
+
+const TOUCH4_STATUS_META: Record<string, { label: string; color: string }> = {
+  connected: { label: "Công tắc Touch4", color: colors.good },
+  disconnected: { label: "Touch4 chưa cấu hình", color: colors.bad },
+  unconfigured: { label: "Touch4 chưa cấu hình", color: colors.bad },
+};
+
+/** Nhãn kết nối: ESP32 (ở nhà) hoặc công tắc Touch4 (công ty). */
+export function connStatusMeta(d: { conn_type: string; esp_status: string }) {
+  return (d.conn_type === "touch4" ? TOUCH4_STATUS_META : ESP_STATUS_META)[d.esp_status] || ESP_STATUS_META.unconfigured;
+}
