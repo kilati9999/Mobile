@@ -5,6 +5,7 @@ import type { Device } from "../api/types";
 import { colors, connStatusMeta, deviceMeta, radius, shadow, spacing, STATUS_META } from "../theme";
 import { doorStateLabel, isDoorMoving, isRollerDoor } from "../utils/door";
 import DevicePowerButton from "./DevicePowerButton";
+import DoorControls from "./DoorControls";
 
 interface Props {
   device: Device;
@@ -54,8 +55,15 @@ export default function DeviceCard({ device, variant = "tile", canControl, busy,
               </Text>
             ) : null}
           </View>
+          {rollerDoor && canControl ? (
+            <View style={styles.rowDoor}>
+              <DoorControls device={device} />
+            </View>
+          ) : null}
         </View>
-        <DevicePowerButton device={device} canControl={canControl} busy={busy} size={54} onToggle={onToggle} />
+        {rollerDoor ? null : (
+          <DevicePowerButton device={device} canControl={canControl} busy={busy} size={54} onToggle={onToggle} />
+        )}
       </TouchableOpacity>
     );
   }
@@ -69,7 +77,13 @@ export default function DeviceCard({ device, variant = "tile", canControl, busy,
         <Ionicons name="chevron-forward" size={15} color={colors.textFaint} />
       </View>
       <View style={styles.tileCenter}>
-        <DevicePowerButton device={device} canControl={canControl} busy={busy} onToggle={onToggle} />
+        {rollerDoor ? (
+          <View style={[styles.doorIcon, { backgroundColor: meta.color + "1f", borderColor: meta.color + "55" }]}>
+            <Ionicons name={meta.icon as any} size={40} color={unhealthy ? colors.textFaint : meta.color} />
+          </View>
+        ) : (
+          <DevicePowerButton device={device} canControl={canControl} busy={busy} onToggle={onToggle} />
+        )}
       </View>
       <Text
         style={[styles.tileSub, active && !unhealthy && { color: meta.color }, unhealthy && { color: colors.bad }]}
@@ -102,6 +116,8 @@ const styles = StyleSheet.create({
   iconWrap: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   name: { color: colors.text, fontSize: 14, fontWeight: "700" },
   tileSub: { color: colors.textFaint, fontSize: 12.5, fontWeight: "600", textAlign: "center" },
+  tileDoor: { marginTop: spacing.sm },
+  doorIcon: { width: 92, height: 92, borderRadius: 46, borderWidth: 2, alignItems: "center", justifyContent: "center" },
 
   row: {
     flexDirection: "row",
@@ -119,5 +135,6 @@ const styles = StyleSheet.create({
   rowBadges: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 6 },
   miniDot: { width: 5, height: 5, borderRadius: 2.5 },
   miniText: { fontSize: 10.5, fontWeight: "700" },
+  rowDoor: { marginTop: spacing.sm },
   macText: { fontSize: 10, color: colors.textFaint, fontFamily: "monospace", marginLeft: 4 },
 });
