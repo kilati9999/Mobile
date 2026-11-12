@@ -77,6 +77,11 @@ export default function DeviceCard({ device, variant = "tile", canControl, busy,
       >
         {subtitleFor(device)}
       </Text>
+      {rollerDoor && canControl ? (
+        <View style={styles.tileDoor}>
+          <DoorControls device={device} />
+        </View>
+      ) : null}
     </TouchableOpacity>
   );
 }
