@@ -56,6 +56,8 @@ export interface FallAlert {
   ack_by: string | null;
 }
 
+export type DoorCmd = "open" | "close" | "stop";
+
 export interface Site {
   id: string;
   name: string;
