@@ -15,7 +15,7 @@ interface Props {
   onDone?: () => void;
 }
 
-/** Nút Lên / Dừng / Xuống cho cửa cuốn (ESP32 slot "door"); cửa Touch4 chỉ có Mở / Đóng. */
+/** Nút Lên / Dừng / Xuống cho cửa cuốn (ESP32 slot "door"); cửa Touch4 cũng có đủ 3 nút (Dừng = nhấn lại nút Touch4). */
 export default function DoorControls({ device, size = "compact", canControl = true, onDone }: Props) {
   const [busy, setBusy] = useState<DoorCmd | null>(null);
   const large = size === "large";

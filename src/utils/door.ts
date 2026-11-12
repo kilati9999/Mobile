@@ -1,7 +1,7 @@
 import type { Device, DoorCmd } from "../api/types";
 
 // Cửa cuốn = thiết bị MQTT gán slot "door" của board ESP32 (gc/firmware/esp32_devices),
-// hoặc cửa cuốn công ty nối công tắc Touch4 (chỉ có Mở / Đóng).
+// hoặc cửa cuốn công ty nối công tắc Touch4 (1 nút: Mở / Đóng, Dừng = nhấn lại khi đang chạy).
 export function isTouch4Door(d: Device): boolean {
   return d.conn_type === "touch4" && d.touch4_slot === "door";
 }
@@ -50,7 +50,8 @@ export function isDoorMoving(d: Device): boolean {
 // Nút nào vô nghĩa với trạng thái hiện tại thì khoá lại. Dừng LUÔN bấm được (an toàn).
 export function doorCmdDisabled(d: Device, cmd: DoorCmd): boolean {
   if (d.status !== "ok") return true;
-  if (isTouch4Door(d)) return cmd === "open" ? d.state : cmd === "close" ? !d.state : true;
+  // Touch4: không biết vị trí thật sau khi Dừng -> luôn cho bấm cả 3 nút
+  if (isTouch4Door(d)) return false;
   if (cmd === "stop") return false;
   if (!d.door_manual) return false;
   const st = d.door_state;
@@ -64,7 +65,7 @@ export const DOOR_BUTTONS: { cmd: DoorCmd; icon: string; manual: string; auto: s
   { cmd: "close", icon: "chevron-down", manual: "Xuống", auto: "Đóng" },
 ];
 
-/** Nút hiện cho từng loại cửa: Touch4 không có lệnh Dừng. */
-export function doorButtons(d: Device) {
-  return isTouch4Door(d) ? DOOR_BUTTONS.filter((b) => b.cmd !== "stop") : DOOR_BUTTONS;
+/** Nút hiện cho cửa cuốn: Lên/Mở - Dừng - Xuống/Đóng (cả ESP32 lẫn Touch4). */
+export function doorButtons(_d: Device) {
+  return DOOR_BUTTONS;
 }
