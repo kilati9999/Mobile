@@ -130,11 +130,13 @@ export default function DeviceDetailScreen({ route }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.heroIconWrap}>
-          <View style={[styles.heroIcon, { backgroundColor: meta.color + "1f" }]}>
-            <Ionicons name={meta.icon as any} size={34} color={meta.color} />
+        {isRollerDoor(device) ? null : (
+          <View style={styles.heroIconWrap}>
+            <View style={[styles.heroIcon, { backgroundColor: meta.color + "1f" }]}>
+              <Ionicons name={meta.icon as any} size={34} color={meta.color} />
+            </View>
           </View>
-        </View>
+        )}
         <Text style={styles.name}>{device.name}</Text>
         <Text style={styles.siteLine}>
           {device.site_name} · {meta.label}

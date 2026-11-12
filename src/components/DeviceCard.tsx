@@ -61,7 +61,13 @@ export default function DeviceCard({ device, variant = "tile", canControl, busy,
             </View>
           ) : null}
         </View>
+<<<<<<< HEAD
+        {rollerDoor ? (
+          <DoorControls device={device} size="medium" canControl={canControl} />
+        ) : (
+=======
         {rollerDoor ? null : (
+>>>>>>> 5ffeab882af5440d7d6149972ed96014e141ee96
           <DevicePowerButton device={device} canControl={canControl} busy={busy} size={54} onToggle={onToggle} />
         )}
       </TouchableOpacity>
@@ -78,9 +84,13 @@ export default function DeviceCard({ device, variant = "tile", canControl, busy,
       </View>
       <View style={styles.tileCenter}>
         {rollerDoor ? (
+<<<<<<< HEAD
+          <DoorControls device={device} size="tile" canControl={canControl} />
+=======
           <View style={[styles.doorIcon, { backgroundColor: meta.color + "1f", borderColor: meta.color + "55" }]}>
             <Ionicons name={meta.icon as any} size={40} color={unhealthy ? colors.textFaint : meta.color} />
           </View>
+>>>>>>> 5ffeab882af5440d7d6149972ed96014e141ee96
         ) : (
           <DevicePowerButton device={device} canControl={canControl} busy={busy} onToggle={onToggle} />
         )}
@@ -116,8 +126,11 @@ const styles = StyleSheet.create({
   iconWrap: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   name: { color: colors.text, fontSize: 14, fontWeight: "700" },
   tileSub: { color: colors.textFaint, fontSize: 12.5, fontWeight: "600", textAlign: "center" },
+<<<<<<< HEAD
+=======
   tileDoor: { marginTop: spacing.sm },
   doorIcon: { width: 92, height: 92, borderRadius: 46, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+>>>>>>> 5ffeab882af5440d7d6149972ed96014e141ee96
 
   row: {
     flexDirection: "row",
