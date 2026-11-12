@@ -56,6 +56,50 @@ export interface FallAlert {
   ack_by: string | null;
 }
 
+export type DoorCmd = "open" | "close" | "stop";
+
+// Cảnh báo té ngã từ camera công ty (server gc /api/falls)
+export interface FallAlert {
+  id: number;
+  time: string; // "HH:MM:SS dd/mm/yyyy"
+  ts: number; // epoch giây (giờ server)
+  camera: string;
+  message: string;
+  has_image: boolean;
+  acknowledged: boolean;
+  ack_by: string | null;
+}
+
+export type DoorCmd = "open" | "close" | "stop";
+
+// Cảnh báo té ngã từ camera công ty (server gc /api/falls)
+export interface FallAlert {
+  id: number;
+  time: string; // "HH:MM:SS dd/mm/yyyy"
+  ts: number; // epoch giây (giờ server)
+  camera: string;
+  message: string;
+  has_image: boolean;
+  acknowledged: boolean;
+  ack_by: string | null;
+}
+
+export type DoorCmd = "open" | "close" | "stop";
+
+// Cảnh báo té ngã từ camera công ty (server gc /api/falls)
+export interface FallAlert {
+  id: number;
+  time: string; // "HH:MM:SS dd/mm/yyyy"
+  ts: number; // epoch giây (giờ server)
+  camera: string;
+  message: string;
+  has_image: boolean;
+  acknowledged: boolean;
+  ack_by: string | null;
+}
+
+export type DoorCmd = "open" | "close" | "stop";
+
 export interface Site {
   id: string;
   name: string;
