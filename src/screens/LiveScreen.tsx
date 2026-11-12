@@ -4,7 +4,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getState } from "../api/client";
+import { CAMERA_FEEDS, getState } from "../api/client";
 import type { HistoryEntry } from "../api/types";
 import CameraFeed from "../components/CameraFeed";
 import { useAuth } from "../context/AuthContext";
@@ -79,7 +79,9 @@ export default function LiveScreen() {
         <Text style={styles.subtitle}>Camera, nhật ký hành động và huấn luyện tại chỗ</Text>
       </View>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <CameraFeed />
+        {CAMERA_FEEDS.map((f) => (
+          <CameraFeed key={f.key} title={f.title} path={f.path} />
+        ))}
 
         <FaceEnrollPanel />
 
