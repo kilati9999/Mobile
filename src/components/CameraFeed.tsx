@@ -3,7 +3,7 @@ import { useIsFocused } from "@react-navigation/native";
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { WebView } from "react-native-webview";
-import { DEFAULT_CAMERA_URL, getCameraUrl, setCameraUrl } from "../api/client";
+import { cameraFeedUrl, DEFAULT_CAMERA_URL, getCameraUrl, setCameraUrl } from "../api/client";
 import { colors, radius, spacing } from "../theme";
 
 // Ép trang của camera vừa khít chiều ngang khung xem (ảnh/video co theo chiều rộng).
@@ -19,8 +19,14 @@ const FIT_SCRIPT = `
 true;
 `;
 
-/** Khung xem hình ảnh trực tiếp từ camera (địa chỉ đặt trong Cài đặt). */
-export default function CameraFeed() {
+interface Props {
+  title?: string;
+  /** Kênh trên server hình của Pi: "" = phòng họp, "door", "hall" */
+  path?: string;
+}
+
+/** Khung xem hình ảnh trực tiếp từ 1 camera (địa chỉ Pi đặt trong Cài đặt, dùng chung cho mọi khung). */
+export default function CameraFeed({ title = "Camera", path = "" }: Props) {
   const focused = useIsFocused();
   const [url, setUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,6 +61,8 @@ export default function CameraFeed() {
     if (focused) getCameraUrl().then(setUrl);
   }, [focused]);
 
+  const feedUrl = url ? cameraFeedUrl(url, path) : null;
+
   const reload = useCallback(() => {
     setError(null);
     setLoading(true);
@@ -66,7 +74,7 @@ export default function CameraFeed() {
       <View style={styles.head}>
         <View style={styles.titleRow}>
           <Ionicons name="videocam" size={15} color={colors.accent} />
-          <Text style={styles.title}>Camera</Text>
+          <Text style={styles.title}>{title}</Text>
         </View>
         <View style={styles.actions}>
           <TouchableOpacity onPress={startEdit} hitSlop={10} accessibilityLabel="Đổi địa chỉ camera">
@@ -80,7 +88,7 @@ export default function CameraFeed() {
 
       {editing ? (
         <View style={styles.editBox}>
-          <Text style={styles.editLabel}>Địa chỉ camera</Text>
+          <Text style={styles.editLabel}>Địa chỉ Pi (dùng chung cho cả 3 camera)</Text>
           <TextInput
             value={draft}
             onChangeText={setDraft}
@@ -107,10 +115,10 @@ export default function CameraFeed() {
       ) : null}
 
       <View style={styles.frame}>
-        {focused && url ? (
+        {focused && feedUrl ? (
           <WebView
-            key={`${url}-${reloadKey}`}
-            source={{ uri: url }}
+            key={`${feedUrl}-${reloadKey}`}
+            source={{ uri: feedUrl }}
             style={styles.web}
             originWhitelist={["*"]}
             injectedJavaScript={FIT_SCRIPT}
@@ -137,7 +145,7 @@ export default function CameraFeed() {
             <Ionicons name="videocam-off" size={22} color={colors.textFaint} />
             <Text style={styles.errText}>{error}</Text>
             <Text style={styles.errHint}>
-              Điện thoại cần cùng mạng với camera (hoặc dùng Tailscale). Địa chỉ: {url}
+              Điện thoại cần cùng mạng với Pi (hoặc dùng Tailscale). Địa chỉ: {feedUrl}
             </Text>
             <TouchableOpacity style={styles.retryBtn} onPress={reload}>
               <Text style={styles.retryText}>Thử lại</Text>
@@ -161,7 +169,7 @@ const styles = StyleSheet.create({
   formErr: { color: colors.bad, fontSize: 11.5 },
   editRow: { flexDirection: "row", justifyContent: "flex-end", gap: 8 },
   saveBtn: { borderColor: colors.accent },
-  frame: { width: "100%", aspectRatio: 16 / 9, backgroundColor: "#000", borderRadius: radius.sm, overflow: "hidden" },
+  frame: { width: "100%", aspectRatio: 4 / 3, backgroundColor: "#000", borderRadius: radius.sm, overflow: "hidden" },
   web: { flex: 1, backgroundColor: "#000" },
   overlay: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center", padding: spacing.md, gap: 6, backgroundColor: "rgba(0,0,0,0.55)" },
   errText: { color: colors.text, fontSize: 12.5, fontWeight: "700", textAlign: "center" },

@@ -1,8 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { ActivityIndicator, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import type { Device } from "../api/types";
-import { colors, deviceMeta, ESP_STATUS_META, radius, shadow, spacing, STATUS_META } from "../theme";
+import { colors, connStatusMeta, deviceMeta, radius, shadow, spacing, STATUS_META } from "../theme";
+import { doorStateLabel, isDoorMoving, isRollerDoor } from "../utils/door";
+import DevicePowerButton from "./DevicePowerButton";
 
 interface Props {
   device: Device;
@@ -15,7 +17,8 @@ interface Props {
 
 function subtitleFor(device: Device): string {
   if (device.status !== "ok") return STATUS_META[device.status]?.label || device.status_label;
-  if (device.type === "door") return device.state ? "Đang mở" : "Đã khoá";
+  if (isRollerDoor(device)) return doorStateLabel(device);
+  if (device.type === "door") return device.state ? "Đang mở" : "Đã đóng";
   if (!device.state) return "Đang tắt";
   return "Đang bật";
 }
@@ -23,7 +26,9 @@ function subtitleFor(device: Device): string {
 export default function DeviceCard({ device, variant = "tile", canControl, busy, onPress, onToggle }: Props) {
   const meta = deviceMeta(device.type);
   const unhealthy = device.status !== "ok";
-  const espMeta = ESP_STATUS_META[device.esp_status];
+  const espMeta = connStatusMeta(device);
+  const rollerDoor = isRollerDoor(device);
+  const active = rollerDoor ? device.door_state === "OPEN" || isDoorMoving(device) : device.state;
 
   if (variant === "row") {
     return (
@@ -50,44 +55,26 @@ export default function DeviceCard({ device, variant = "tile", canControl, busy,
             ) : null}
           </View>
         </View>
-        {busy ? (
-          <ActivityIndicator size="small" color={colors.accent} />
-        ) : canControl ? (
-          <Switch
-            value={device.state}
-            onValueChange={onToggle}
-            disabled={unhealthy}
-            trackColor={{ false: colors.cardAlt, true: colors.accent }}
-            thumbColor={colors.text}
-          />
-        ) : null}
+        <DevicePowerButton device={device} canControl={canControl} busy={busy} size={54} onToggle={onToggle} />
       </TouchableOpacity>
     );
   }
 
   return (
-    <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={[styles.tile, shadow.card, device.state && !unhealthy && styles.tileActive]}>
+    <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={[styles.tile, shadow.card, active && !unhealthy && { borderColor: meta.color + "66" }]}>
       <View style={styles.tileTop}>
-        <View style={[styles.iconWrap, { backgroundColor: meta.color + "1f" }]}>
-          <Ionicons name={meta.icon as any} size={20} color={meta.color} />
-        </View>
-        {busy ? (
-          <ActivityIndicator size="small" color={colors.accent} />
-        ) : canControl ? (
-          <Switch
-            value={device.state}
-            onValueChange={onToggle}
-            disabled={unhealthy}
-            trackColor={{ false: colors.cardAlt, true: colors.accent }}
-            thumbColor={colors.text}
-            style={styles.tileSwitch}
-          />
-        ) : null}
+        <Text style={[styles.name, styles.tileName]} numberOfLines={1}>
+          {device.name}
+        </Text>
+        <Ionicons name="chevron-forward" size={15} color={colors.textFaint} />
       </View>
-      <Text style={styles.name} numberOfLines={1}>
-        {device.name}
-      </Text>
-      <Text style={[styles.tileSub, unhealthy && { color: colors.bad }]} numberOfLines={1}>
+      <View style={styles.tileCenter}>
+        <DevicePowerButton device={device} canControl={canControl} busy={busy} onToggle={onToggle} />
+      </View>
+      <Text
+        style={[styles.tileSub, active && !unhealthy && { color: meta.color }, unhealthy && { color: colors.bad }]}
+        numberOfLines={1}
+      >
         {subtitleFor(device)}
       </Text>
     </TouchableOpacity>
@@ -102,15 +89,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,
-    minHeight: 118,
     minWidth: "45%",
   },
-  tileActive: { borderColor: colors.accent + "55" },
-  tileTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.md },
-  tileSwitch: { transform: [{ scaleX: 0.82 }, { scaleY: 0.82 }] },
+  tileTop: { flexDirection: "row", alignItems: "center", gap: 4 },
+  tileName: { flex: 1, textAlign: "center", marginLeft: 15 },
+  tileCenter: { alignItems: "center", justifyContent: "center", paddingVertical: spacing.lg },
   iconWrap: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   name: { color: colors.text, fontSize: 14, fontWeight: "700" },
-  tileSub: { color: colors.textFaint, fontSize: 11.5, marginTop: 3 },
+  tileSub: { color: colors.textFaint, fontSize: 12.5, fontWeight: "600", textAlign: "center" },
 
   row: {
     flexDirection: "row",
