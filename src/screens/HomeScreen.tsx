@@ -40,7 +40,7 @@ export default function HomeScreen() {
 
   const devicesBySite = new Map<string, Device[]>();
   (data?.devices || [])
-    .filter((d) => !!d.mac) // chỉ hiện thiết bị đã gán board ESP32 thật - không còn mô phỏng
+    .filter((d) => !!d.mac || d.conn_type === "touch4") // thiết bị thật: board ESP32 hoặc công tắc Touch4
     .forEach((d) => {
       const list = devicesBySite.get(d.site_id) || [];
       list.push(d);
@@ -100,7 +100,7 @@ export default function HomeScreen() {
 
           {data && devicesBySite.size === 0 && (
             <Text style={styles.empty}>
-              Chưa có thiết bị nào đã ghép nối ESP32{user?.role === "admin" ? " - vào tab Thiết bị để thêm." : "."}
+              Chưa có thiết bị nào (ESP32 / Touch4){user?.role === "admin" ? " - vào tab Thiết bị để thêm." : "."}
             </Text>
           )}
         </View>
