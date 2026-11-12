@@ -27,7 +27,10 @@ export default function DevicesScreen() {
 
   // Chỉ hiện thiết bị đã ghép nối ESP32 thật (đã gán Chip ID) trong danh
   // sách chính - không còn thiết bị mô phỏng/chưa cấu hình lẫn vào đây.
-  const connectedDevices = useMemo(() => (data?.devices || []).filter((d) => !!d.mac), [data]);
+  const connectedDevices = useMemo(
+    () => (data?.devices || []).filter((d) => !!d.mac || d.conn_type === "touch4"),
+    [data]
+  );
 
   const chips = useMemo(() => {
     const all = { id: null as string | null, name: "Tất cả", count: data?.sites.reduce((a, s) => a + s.device_count, 0) || 0 };

@@ -2,7 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { ActivityIndicator, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import type { Device } from "../api/types";
-import { colors, deviceMeta, ESP_STATUS_META, radius, shadow, spacing, STATUS_META } from "../theme";
+import { colors, connStatusMeta, deviceMeta, radius, shadow, spacing, STATUS_META } from "../theme";
+import { doorStateLabel, isDoorMoving, isRollerDoor } from "../utils/door";
+import DoorControls from "./DoorControls";
 
 interface Props {
   device: Device;
@@ -15,7 +17,8 @@ interface Props {
 
 function subtitleFor(device: Device): string {
   if (device.status !== "ok") return STATUS_META[device.status]?.label || device.status_label;
-  if (device.type === "door") return device.state ? "Đang mở" : "Đã khoá";
+  if (isRollerDoor(device)) return doorStateLabel(device);
+  if (device.type === "door") return device.state ? "Đang mở" : "Đã đóng";
   if (!device.state) return "Đang tắt";
   return "Đang bật";
 }
@@ -23,7 +26,9 @@ function subtitleFor(device: Device): string {
 export default function DeviceCard({ device, variant = "tile", canControl, busy, onPress, onToggle }: Props) {
   const meta = deviceMeta(device.type);
   const unhealthy = device.status !== "ok";
-  const espMeta = ESP_STATUS_META[device.esp_status];
+  const espMeta = connStatusMeta(device);
+  const rollerDoor = isRollerDoor(device);
+  const active = rollerDoor ? isDoorMoving(device) : device.state;
 
   if (variant === "row") {
     return (
@@ -50,7 +55,9 @@ export default function DeviceCard({ device, variant = "tile", canControl, busy,
             ) : null}
           </View>
         </View>
-        {busy ? (
+        {rollerDoor ? (
+          canControl ? <DoorControls device={device} /> : null
+        ) : busy ? (
           <ActivityIndicator size="small" color={colors.accent} />
         ) : canControl ? (
           <Switch
@@ -66,12 +73,12 @@ export default function DeviceCard({ device, variant = "tile", canControl, busy,
   }
 
   return (
-    <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={[styles.tile, shadow.card, device.state && !unhealthy && styles.tileActive]}>
+    <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={[styles.tile, shadow.card, active && !unhealthy && styles.tileActive]}>
       <View style={styles.tileTop}>
         <View style={[styles.iconWrap, { backgroundColor: meta.color + "1f" }]}>
           <Ionicons name={meta.icon as any} size={20} color={meta.color} />
         </View>
-        {busy ? (
+        {rollerDoor ? null : busy ? (
           <ActivityIndicator size="small" color={colors.accent} />
         ) : canControl ? (
           <Switch
@@ -90,6 +97,11 @@ export default function DeviceCard({ device, variant = "tile", canControl, busy,
       <Text style={[styles.tileSub, unhealthy && { color: colors.bad }]} numberOfLines={1}>
         {subtitleFor(device)}
       </Text>
+      {rollerDoor && canControl ? (
+        <View style={styles.tileDoor}>
+          <DoorControls device={device} />
+        </View>
+      ) : null}
     </TouchableOpacity>
   );
 }
@@ -111,6 +123,7 @@ const styles = StyleSheet.create({
   iconWrap: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   name: { color: colors.text, fontSize: 14, fontWeight: "700" },
   tileSub: { color: colors.textFaint, fontSize: 11.5, marginTop: 3 },
+  tileDoor: { marginTop: spacing.sm },
 
   row: {
     flexDirection: "row",

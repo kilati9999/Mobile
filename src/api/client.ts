@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
-import type { Account, Device, PendingBoard, Site, StateResponse, User } from "./types";
+import type { Account, Device, DoorCmd, FallAlert, PendingBoard, SensorsResponse, Site, StateResponse, User } from "./types";
 
 const SERVER_URL_KEY = "gesture-home:server-url";
 
@@ -59,6 +59,21 @@ export async function getCameraUrl(): Promise<string> {
   const stored = await AsyncStorage.getItem(CAMERA_URL_KEY);
   cachedCameraUrl = stored || DEFAULT_CAMERA_URL;
   return cachedCameraUrl;
+}
+
+// 3 camera công ty - Pi phát cùng 1 cổng (gesture_control_pi.py, MjpegStreamer):
+//   http://<Pi>:8090/      phòng họp      http://<Pi>:8090/door   cửa cuốn      http://<Pi>:8090/hall   camera 8006
+export const CAMERA_FEEDS = [
+  { key: "room", title: "Phòng họp · cam 8000", path: "" },
+  { key: "door", title: "Cửa cuốn · cam 8002", path: "door" },
+  { key: "hall", title: "Camera 8006", path: "hall" },
+] as const;
+
+/** Ghép địa chỉ Pi (lưu trong Cài đặt) với đường dẫn kênh camera. */
+export function cameraFeedUrl(base: string, path: string): string {
+  const m = base.trim().match(/^(https?:\/\/[^/?#]+)/);
+  const origin = m ? m[1] : base.trim().replace(/\/+$/, "");
+  return `${origin}/${path}`;
 }
 
 export async function setCameraUrl(url: string): Promise<void> {
@@ -191,6 +206,11 @@ export function getSites(): Promise<Site[]> {
   return request<Site[]>("/api/sites");
 }
 
+// Khôi phục (bị xoá nhầm ở 1.1.2) - FireBanner / SensorSection / SensorsScreen cần hàm này
+export function getSensors(): Promise<SensorsResponse> {
+  return request<SensorsResponse>("/api/sensors");
+}
+
 export function getHistory(): Promise<any[]> {
   return request<any[]>("/api/history");
 }
@@ -199,6 +219,31 @@ export function getHistory(): Promise<any[]> {
 
 export async function toggleDevice(deviceId: string): Promise<Device> {
   return request<Device>(`/api/devices/${encodeURIComponent(deviceId)}/toggle`, { method: "POST" });
+}
+
+// ---------------------------------------------------------- té ngã ----
+export function getFalls(): Promise<FallAlert[]> {
+  return request<FallAlert[]>("/api/falls");
+}
+
+/** Ảnh chụp lúc ngã (base64 JPEG) - qua fetch để chắc chắn mang cookie đăng nhập. */
+export async function getFallImage(id: number): Promise<string> {
+  const res = await request<{ image: string }>(`/api/falls/${id}/image64`);
+  return res.image;
+}
+
+/** Đã xem -> tắt chuông trên mọi máy. id = "all" để xác nhận tất cả. */
+export function ackFall(id: number | "all"): Promise<{ ok: boolean; alerts: FallAlert[] }> {
+  return request(`/api/falls/${id}/ack`, { method: "POST" });
+}
+
+// Cửa cuốn: open = chạy lên, close = chạy xuống, stop = dừng (POST /api/devices/<id>/door)
+export async function doorCommand(deviceId: string, cmd: DoorCmd): Promise<Device> {
+  // Lỗi (409) trả {error, reason} -> request() ném ApiError, lý do nằm ở e.payload.reason
+  return request<Device>(`/api/devices/${encodeURIComponent(deviceId)}/door`, {
+    method: "POST",
+    body: JSON.stringify({ cmd }),
+  });
 }
 
 // ---------------------------------------------------------------------

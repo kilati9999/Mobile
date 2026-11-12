@@ -152,7 +152,7 @@ export default function SettingsScreen() {
         <View style={styles.divider} />
 
         <Text style={styles.sectionTitle}>Địa chỉ camera (xem ở tab Trực tiếp)</Text>
-        <Text style={styles.desc}>Địa chỉ trang/luồng hình ảnh của camera, ví dụ http://100.90.119.70:8090/</Text>
+        <Text style={styles.desc}>Địa chỉ server hình của Pi (dùng chung cho 3 camera: /, /door, /hall), ví dụ http://100.90.119.70:8090/</Text>
         <TextInput
           value={cameraUrl}
           onChangeText={setCameraUrlState}

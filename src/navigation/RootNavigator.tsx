@@ -1,6 +1,7 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import FallAlertOverlay from "../components/FallAlertOverlay";
 import { useAuth } from "../context/AuthContext";
 import DeviceDetailScreen from "../screens/DeviceDetailScreen";
 import DeviceFormScreen from "../screens/DeviceFormScreen";
@@ -37,6 +38,7 @@ export default function RootNavigator() {
   }
 
   return (
+    <View style={styles.root}>
     <Stack.Navigator screenOptions={{ ...headerOptions }}>
       {!serverConfigured ? (
         <Stack.Screen name="ServerSetup" component={ServerSetupScreen} options={{ headerShown: false }} />
@@ -67,10 +69,13 @@ export default function RootNavigator() {
         </>
       )}
     </Stack.Navigator>
+    {serverConfigured && user ? <FallAlertOverlay /> : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   bootWrap: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg, gap: 12 },
   bootText: { color: colors.textFaint, fontSize: 12.5 },
 });

@@ -6,10 +6,12 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, Touchab
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ApiError, deleteDeviceApi, disconnectDevice, getDevices, toggleDevice } from "../api/client";
 import type { Device } from "../api/types";
+import DoorControls from "../components/DoorControls";
 import StatusPill from "../components/StatusPill";
 import { useAuth } from "../context/AuthContext";
 import type { RootStackParamList } from "../navigation/types";
-import { colors, deviceMeta, ESP_STATUS_META, radius, spacing, STATUS_META, typography } from "../theme";
+import { colors, connStatusMeta, deviceMeta, radius, spacing, STATUS_META, typography } from "../theme";
+import { doorStateLabel, isRollerDoor } from "../utils/door";
 
 type Props = NativeStackScreenProps<RootStackParamList, "DeviceDetail">;
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -57,7 +59,8 @@ export default function DeviceDetailScreen({ route }: Props) {
 
   const meta = deviceMeta(device.type);
   const statusMeta = STATUS_META[device.status];
-  const espMeta = ESP_STATUS_META[device.esp_status];
+  const espMeta = connStatusMeta(device);
+  const touch4 = device.conn_type === "touch4";
 
   async function handleToggle() {
     setSaving(true);
@@ -142,6 +145,22 @@ export default function DeviceDetailScreen({ route }: Props) {
           <StatusPill label={espMeta.label} color={espMeta.color} />
         </View>
 
+        {isRollerDoor(device) ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Cửa cuốn{device.door_manual ? " · thủ công" : ""}</Text>
+            <Text style={styles.cardSub}>{doorStateLabel(device)}</Text>
+            {canControl ? (
+              <>
+                <DoorControls device={device} size="large" onDone={load} />
+                {device.door_manual ? (
+                  <Text style={styles.doorHint}>
+                    Cửa chạy liên tục đến khi bấm Dừng hoặc chạm công tắc hành trình. Khi báo cháy, ESP32 chỉ kêu còi — cửa không tự mở.
+                  </Text>
+                ) : null}
+              </>
+            ) : null}
+          </View>
+        ) : (
         <View style={styles.card}>
           <View style={styles.toggleRow}>
             <View>
@@ -163,18 +182,27 @@ export default function DeviceDetailScreen({ route }: Props) {
             )}
           </View>
         </View>
+        )}
 
         <Text style={styles.sectionTitle}>Kết nối &amp; cấu hình</Text>
         <View style={styles.card}>
           <InfoRow label="Người phụ trách" value={device.assigned_user || "Chưa gán"} />
-          <InfoRow label="MAC / Chip ID ESP32" value={device.mac || "Chưa gán"} mono />
-          {device.mac ? (
+          {touch4 ? (
+            <InfoRow label="Kiểu kết nối" value={`Công tắc Touch4 (${device.touch4_slot})`} />
+          ) : (
+            <InfoRow label="MAC / Chip ID ESP32" value={device.mac || "Chưa gán"} mono />
+          )}
+          {device.mac && !touch4 ? (
             <InfoRow
               label="Kiểu kết nối"
               value={device.conn_type === "mqtt" ? `MQTT (relay: ${device.mqtt_slot})` : "HTTP (pair/heartbeat)"}
             />
           ) : null}
-          <InfoRow label="Địa chỉ IP" value={device.ip || (device.conn_type === "mqtt" ? "Qua broker MQTT" : "—")} mono />
+          <InfoRow
+            label="Địa chỉ IP"
+            value={device.ip || (device.conn_type === "mqtt" ? "Qua broker MQTT" : touch4 ? "Qua MQTT cloud" : "—")}
+            mono
+          />
           <InfoRow label="Nguồn điện" value={device.power_source + (device.battery !== null ? ` · ${device.battery}%` : "")} />
           <InfoRow label="Cập nhật lúc" value={device.last_seen || "—"} mono />
           {device.error_reason ? <InfoRow label="Lý do lỗi" value={device.error_reason} /> : null}
@@ -226,6 +254,7 @@ const styles = StyleSheet.create({
   toggleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   cardTitle: { color: colors.text, fontSize: 14, fontWeight: "700" },
   cardSub: { color: colors.textFaint, fontSize: 11.5, marginTop: 2 },
+  doorHint: { color: colors.textFaint, fontSize: 11, marginTop: spacing.sm, lineHeight: 15 },
   sectionTitle: { color: colors.textFaint, fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 1, marginBottom: spacing.sm },
   infoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.border },
   infoLabel: { color: colors.textFaint, fontSize: 12.5 },
