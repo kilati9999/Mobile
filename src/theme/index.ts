@@ -59,6 +59,7 @@ export const DEVICE_TYPE_META: Record<string, { icon: string; label: string; col
   dimmer: { icon: "bulb", label: "Đèn", color: colors.warn },
   speed: { icon: "aperture", label: "Quạt", color: colors.sky },
   switch: { icon: "flash", label: "Ổ cắm / relay", color: colors.violet },
+  ac: { icon: "snow", label: "Máy lạnh", color: colors.sky },
   door: { icon: "lock-closed", label: "Cửa", color: colors.accent },
 };
 

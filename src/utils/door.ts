@@ -1,7 +1,7 @@
 import type { Device, DoorCmd } from "../api/types";
 
 // Cửa cuốn = thiết bị MQTT gán slot "door" của board ESP32 (gc/firmware/esp32_devices),
-// hoặc cửa cuốn công ty nối công tắc Touch4 (1 nút: Mở / Đóng, Dừng = nhấn lại khi đang chạy).
+// hoặc cửa cuốn công ty nối công tắc Touch4 (2 nút: Lên / Xuống, KHÔNG có Dừng).
 export function isTouch4Door(d: Device): boolean {
   return d.conn_type === "touch4" && d.touch4_slot === "door";
 }
@@ -37,6 +37,8 @@ const ERROR_LABEL: Record<string, string> = {
 };
 
 export function doorStateLabel(d: Device): string {
+  // Touch4 không báo vị trí thật về -> chỉ biết lệnh vừa gửi
+  if (isTouch4Door(d)) return d.state ? "Lệnh gần nhất: Lên" : "Lệnh gần nhất: Xuống";
   const st = d.door_state || "";
   if (st === "ERROR" && d.door_error && ERROR_LABEL[d.door_error]) return ERROR_LABEL[d.door_error];
   const labels = d.door_manual ? LABEL_MANUAL : LABEL_AUTO;
@@ -50,7 +52,7 @@ export function isDoorMoving(d: Device): boolean {
 // Nút nào vô nghĩa với trạng thái hiện tại thì khoá lại. Dừng LUÔN bấm được (an toàn).
 export function doorCmdDisabled(d: Device, cmd: DoorCmd): boolean {
   if (d.status !== "ok") return true;
-  // Touch4: không biết vị trí thật sau khi Dừng -> luôn cho bấm cả 3 nút
+  // Touch4: không biết vị trí thật của cửa -> luôn cho bấm Lên / Xuống
   if (isTouch4Door(d)) return false;
   if (cmd === "stop") return false;
   if (!d.door_manual) return false;
@@ -65,7 +67,12 @@ export const DOOR_BUTTONS: { cmd: DoorCmd; icon: string; manual: string; auto: s
   { cmd: "close", icon: "chevron-down", manual: "Xuống", auto: "Đóng" },
 ];
 
-/** Nút hiện cho cửa cuốn: Lên/Mở - Dừng - Xuống/Đóng (cả ESP32 lẫn Touch4). */
-export function doorButtons(_d: Device) {
-  return DOOR_BUTTONS;
+/** Nút hiện cho cửa cuốn: ESP32 = Lên/Mở - Dừng - Xuống/Đóng; Touch4 công ty = chỉ Lên - Xuống. */
+export function doorButtons(d: Device) {
+  return isTouch4Door(d) ? DOOR_BUTTONS.filter((b) => b.cmd !== "stop") : DOOR_BUTTONS;
+}
+
+/** Hiện nhãn Lên / Xuống (thay vì Mở / Đóng): cửa ESP32 chế độ tay và cửa Touch4. */
+export function doorUsesUpDownLabels(d: Device): boolean {
+  return !!d.door_manual || isTouch4Door(d);
 }

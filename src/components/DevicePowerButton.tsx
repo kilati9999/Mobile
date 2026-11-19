@@ -34,6 +34,7 @@ function iconFor(d: Device, on: boolean): string {
   }
   if (d.type === "dimmer") return on ? "lightbulb-on" : "lightbulb-outline";
   if (d.type === "speed") return "fan";
+  if (d.type === "ac") return on ? "air-conditioner" : "snowflake-off";
   return "power";
 }
 

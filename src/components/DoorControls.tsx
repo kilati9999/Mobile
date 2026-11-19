@@ -4,7 +4,7 @@ import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } fr
 import { ApiError, doorCommand } from "../api/client";
 import type { Device, DoorCmd } from "../api/types";
 import { colors, radius, spacing } from "../theme";
-import { doorButtons, doorCmdDisabled } from "../utils/door";
+import { doorButtons, doorCmdDisabled, doorUsesUpDownLabels } from "../utils/door";
 
 interface Props {
   device: Device;
@@ -15,7 +15,7 @@ interface Props {
   onDone?: () => void;
 }
 
-/** Nút Lên / Dừng / Xuống cho cửa cuốn (ESP32 slot "door"); cửa Touch4 cũng có đủ 3 nút (Dừng = nhấn lại nút Touch4). */
+/** Nút Lên / Dừng / Xuống cho cửa cuốn ESP32 (slot "door"); cửa Touch4 công ty chỉ có Lên / Xuống. */
 export default function DoorControls({ device, size = "compact", canControl = true, onDone }: Props) {
   const [busy, setBusy] = useState<DoorCmd | null>(null);
   const large = size === "large";
@@ -59,7 +59,7 @@ export default function DoorControls({ device, size = "compact", canControl = tr
               <>
                 <Ionicons name={b.icon as any} size={iconSize} color={tint} />
                 {large ? (
-                  <Text style={[styles.label, { color: tint }]}>{device.door_manual ? b.manual : b.auto}</Text>
+                  <Text style={[styles.label, { color: tint }]}>{doorUsesUpDownLabels(device) ? b.manual : b.auto}</Text>
                 ) : null}
               </>
             )}
