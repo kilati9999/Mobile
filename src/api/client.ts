@@ -20,11 +20,13 @@ export async function getServerUrl(): Promise<string> {
 export async function setServerUrl(url: string): Promise<void> {
   const trimmed = url.trim().replace(/\/+$/, "");
   cachedServerUrl = trimmed;
+  resolvedCamera = null; // IP server đổi -> địa chỉ camera dự phòng cũng đổi
   await AsyncStorage.setItem(SERVER_URL_KEY, trimmed);
 }
 
 export async function clearServerUrl(): Promise<void> {
   cachedServerUrl = null;
+  resolvedCamera = null;
   await AsyncStorage.removeItem(SERVER_URL_KEY);
 }
 
@@ -79,7 +81,82 @@ export function cameraFeedUrl(base: string, path: string): string {
 export async function setCameraUrl(url: string): Promise<void> {
   const trimmed = url.trim();
   cachedCameraUrl = trimmed;
+  resolvedCamera = null;
   await AsyncStorage.setItem(CAMERA_URL_KEY, trimmed);
+}
+
+// ---- Tự chọn địa chỉ camera dùng được --------------------------------
+// Địa chỉ camera mặc định là IP Tailscale của Pi. Khi điện thoại tắt Tailscale
+// nhưng đang cùng WiFi với Pi, thử thêm IP của địa chỉ server (Cài đặt) với
+// cùng cổng camera (8090) - Pi chạy cả server lẫn camera nên IP LAN dùng được.
+
+export interface CameraOrigin {
+  /** origin dùng để xem, ví dụ http://192.168.3.122:8090 */
+  origin: string;
+  /** true = đang dùng IP của server thay cho địa chỉ camera đã lưu */
+  fallback: boolean;
+  /** false = không địa chỉ nào phản hồi (vẫn trả origin đã lưu để hiện lỗi) */
+  reachable: boolean;
+}
+
+const CAMERA_PROBE_TIMEOUT_MS = 4000;
+const CAMERA_RESOLVE_TTL_MS = 60000;
+let resolvedCamera: { at: number; promise: Promise<CameraOrigin> } | null = null;
+
+function parseOrigin(url: string): { protocol: string; host: string; port: string } | null {
+  const m = url.trim().match(/^(https?):\/\/(\[[^\]]+\]|[^/:?#]+)(?::(\d+))?/i);
+  if (!m) return null;
+  const protocol = m[1].toLowerCase();
+  return { protocol, host: m[2], port: m[3] || (protocol === "https" ? "443" : "80") };
+}
+
+/** Bất kỳ phản hồi HTTP nào = mạng thông; chỉ lỗi mạng/timeout mới là thất bại. */
+async function probeCamera(origin: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CAMERA_PROBE_TIMEOUT_MS);
+  try {
+    // "/" của server camera là trang HTML nhỏ (không phải luồng MJPEG) - nhẹ để thử.
+    await fetch(`${origin}/`, { signal: controller.signal });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function doResolveCamera(): Promise<CameraOrigin> {
+  const cameraUrl = await getCameraUrl();
+  const cam = parseOrigin(cameraUrl);
+  const primary = cameraFeedUrl(cameraUrl, "").replace(/\/+$/, "");
+  if (!cam) return { origin: primary, fallback: false, reachable: false };
+
+  let alt: string | null = null;
+  const srv = parseOrigin(await getServerUrl());
+  if (srv && srv.host.toLowerCase() !== cam.host.toLowerCase()) {
+    alt = `${cam.protocol}://${srv.host}:${cam.port}`;
+  }
+
+  // Thử song song; ưu tiên địa chỉ đã lưu nếu cả hai cùng được.
+  const [okPrimary, okAlt] = await Promise.all([probeCamera(primary), alt ? probeCamera(alt) : Promise.resolve(false)]);
+  if (okPrimary) return { origin: primary, fallback: false, reachable: true };
+  if (alt && okAlt) return { origin: alt, fallback: true, reachable: true };
+  return { origin: primary, fallback: false, reachable: false };
+}
+
+/** Địa chỉ camera dùng được (dùng chung cho cả 3 khung, nhớ 60 giây). force = thử lại ngay. */
+export function resolveCameraOrigin(force = false): Promise<CameraOrigin> {
+  const now = Date.now();
+  if (!force && resolvedCamera && now - resolvedCamera.at < CAMERA_RESOLVE_TTL_MS) {
+    return resolvedCamera.promise;
+  }
+  const promise = doResolveCamera();
+  resolvedCamera = { at: now, promise };
+  // Không nhớ kết quả "không kết nối được" - lần sau thử lại từ đầu.
+  promise.then((r) => {
+    if (!r.reachable && resolvedCamera?.promise === promise) resolvedCamera = null;
+  });
+  return promise;
 }
 
 // API_KEY tuỳ chọn của main.py (biến môi trường API_KEY trên Pi) - nếu

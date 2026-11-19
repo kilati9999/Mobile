@@ -3,7 +3,7 @@ import { useIsFocused } from "@react-navigation/native";
 import React, { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { WebView } from "react-native-webview";
-import { cameraFeedUrl, DEFAULT_CAMERA_URL, getCameraUrl, setCameraUrl } from "../api/client";
+import { cameraFeedUrl, DEFAULT_CAMERA_URL, getCameraUrl, resolveCameraOrigin, setCameraUrl } from "../api/client";
 import { colors, radius, spacing } from "../theme";
 
 // Ép trang của camera vừa khít chiều ngang khung xem (ảnh/video co theo chiều rộng).
@@ -29,6 +29,9 @@ interface Props {
 export default function CameraFeed({ title = "Camera", path = "" }: Props) {
   const focused = useIsFocused();
   const [url, setUrl] = useState<string | null>(null);
+  /** Địa chỉ thực sự dùng để xem (địa chỉ đã lưu, hoặc IP của server nếu Tailscale không thông). */
+  const [origin, setOrigin] = useState<string | null>(null);
+  const [fallback, setFallback] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -51,23 +54,41 @@ export default function CameraFeed({ title = "Camera", path = "" }: Props) {
     await setCameraUrl(v);
     setUrl(v);
     setEditing(false);
-    setError(null);
-    setLoading(true);
-    setReloadKey((k) => k + 1);
+    resolve(true);
   };
 
-  useEffect(() => {
-    // đọc lại mỗi lần quay về tab (đề phòng vừa đổi địa chỉ trong Cài đặt)
-    if (focused) getCameraUrl().then(setUrl);
-  }, [focused]);
-
-  const feedUrl = url ? cameraFeedUrl(url, path) : null;
-
-  const reload = useCallback(() => {
+  /** Chọn địa chỉ camera dùng được rồi mới mở khung xem. force = bỏ qua kết quả đã nhớ. */
+  const resolve = useCallback((force: boolean) => {
+    let cancelled = false;
     setError(null);
     setLoading(true);
-    setReloadKey((k) => k + 1);
+    setOrigin(null);
+    getCameraUrl().then(setUrl);
+    resolveCameraOrigin(force).then((r) => {
+      if (cancelled) return;
+      setFallback(r.fallback);
+      setOrigin(r.origin);
+      if (!r.reachable) {
+        setLoading(false);
+        setError("Không kết nối được camera");
+      }
+      setReloadKey((k) => k + 1);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    // chọn lại mỗi lần quay về tab (đề phòng vừa đổi địa chỉ / đổi mạng)
+    if (focused) return resolve(false);
+  }, [focused, resolve]);
+
+  const feedUrl = origin ? cameraFeedUrl(origin, path) : null;
+
+  const reload = useCallback(() => {
+    resolve(true);
+  }, [resolve]);
 
   return (
     <View style={styles.card}>
@@ -115,7 +136,7 @@ export default function CameraFeed({ title = "Camera", path = "" }: Props) {
       ) : null}
 
       <View style={styles.frame}>
-        {focused && feedUrl ? (
+        {focused && feedUrl && !error ? (
           <WebView
             key={`${feedUrl}-${reloadKey}`}
             source={{ uri: feedUrl }}
@@ -145,7 +166,7 @@ export default function CameraFeed({ title = "Camera", path = "" }: Props) {
             <Ionicons name="videocam-off" size={22} color={colors.textFaint} />
             <Text style={styles.errText}>{error}</Text>
             <Text style={styles.errHint}>
-              Điện thoại cần cùng mạng với Pi (hoặc dùng Tailscale). Địa chỉ: {feedUrl}
+              Bật Tailscale trên điện thoại, hoặc dùng chung WiFi với Pi. Địa chỉ: {feedUrl}
             </Text>
             <TouchableOpacity style={styles.retryBtn} onPress={reload}>
               <Text style={styles.retryText}>Thử lại</Text>
@@ -153,6 +174,9 @@ export default function CameraFeed({ title = "Camera", path = "" }: Props) {
           </View>
         ) : null}
       </View>
+      {fallback && origin && !error ? (
+        <Text style={styles.fallbackNote}>Tailscale không kết nối được - đang xem qua mạng nội bộ ({origin})</Text>
+      ) : null}
     </View>
   );
 }
@@ -175,5 +199,6 @@ const styles = StyleSheet.create({
   errText: { color: colors.text, fontSize: 12.5, fontWeight: "700", textAlign: "center" },
   errHint: { color: colors.textFaint, fontSize: 11, textAlign: "center" },
   retryBtn: { marginTop: 4, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, paddingHorizontal: 16, paddingVertical: 7 },
+  fallbackNote: { color: colors.textFaint, fontSize: 10.5, marginTop: 6 },
   retryText: { color: colors.text, fontSize: 12, fontWeight: "700" },
 });
